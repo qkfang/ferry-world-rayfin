@@ -290,7 +290,6 @@ export function HarbourScene({ sites, onArrive }: HarbourSceneProps) {
       } else {
         const dir = new THREE.Vector3().subVectors(to, from);
         const dist = dir.length();
-        const step = (FERRY_SPEED * delta) / (dist || 1);
         const current = ferry.position.clone();
         current.y = WATER_LEVEL;
         const travelled = new THREE.Vector3().subVectors(current, from).length();
@@ -301,7 +300,6 @@ export function HarbourScene({ sites, onArrive }: HarbourSceneProps) {
         if (dist > 0.001) {
           ferry.rotation.y = Math.atan2(dir.x, dir.z) - Math.PI / 2;
         }
-        void step;
 
         if (nextT >= 1) {
           segment = (segment + 1) % route.length;

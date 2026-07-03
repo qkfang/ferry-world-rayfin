@@ -42,9 +42,7 @@ export function useSites(): UseSitesResult {
 
       // Seed the Sydney Harbour sites on first load if the table is empty.
       if (data.length === 0) {
-        for (const site of DEFAULT_SITES) {
-          await siteService.createSite(site);
-        }
+        await Promise.all(DEFAULT_SITES.map((site) => siteService.createSite(site)));
         data = await siteService.getSites();
       }
 
