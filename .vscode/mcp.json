@@ -1,12 +1,14 @@
 {
-    "servers": {
-        "microsoft-learn": {
-            "type": "http",
-            "url": "https://learn.microsoft.com/api/mcp"
-        },
-        "github": {
-            "type": "http",
-            "url": "https://api.githubcopilot.com/mcp/"
-        }
+  "servers": {
+    "Project-Rayfin": {
+      "type": "stdio",
+      "command": "npm",
+      "args": [
+        "exec",
+        "@microsoft/rayfin-mcp",
+        "--",
+        "start"
+      ]
     }
+  }
 }

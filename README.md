@@ -1,9 +1,160 @@
-# template-repo
+# Getting Started with Auth
 
+A Rayfin todo app with Tailwind CSS, shadcn UI components, and Fabric Entra authentication.
+Each user owns their own todos via role-based access policies.
+Demonstrates a production-first workflow: deploy with `rayfin up`, then iterate locally with `npm run dev:fabric`.
 
-# project
+## Features
 
-project_name=market
+- **Todo Management**: Create, complete, and delete tasks backed by Rayfin Data API
+- **Milestone Seeding**: Pre-populated journey milestones on first load
+- **Radix UI Components**: Production-ready components styled with Tailwind CSS v4
+- **Production-First Workflow**: Deploy first, develop against Fabric backend
+- **Authentication**: Fabric Entra SSO in production; mock email/password for local dev
 
-# infra
+## Getting Started
 
+### Prerequisites
+
+- Node.js 20+
+- Docker Desktop (for local backend)
+
+### Deploy to Fabric (Primary Workflow)
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Deploy the app to Fabric and start the local dev server:
+
+   ```bash
+   npm run dev
+   ```
+
+3. Open your browser to the Vite dev server URL shown in the terminal.
+
+## Authentication
+
+Authentication is enabled by default.
+In production (after `rayfin up`), users sign in via Fabric Entra SSO.
+For local development (`npm run dev`), a mock auth service auto-signs in with a configurable email/password against the local backend.
+
+The `ServiceContainer` auto-detects the backend URL and selects the right auth service:
+
+- **Localhost** → `MockAuthService` (email/password, auto-creates accounts)
+- **Production** → `RayfinAuthService` → `RayfinFabricAuthService` (Fabric Entra)
+
+Key auth files:
+
+| File | Purpose |
+| --- | --- |
+| `rayfin/rayfin.yml` | Auth service configuration (auth, Fabric, password enabled) |
+| `rayfin/data/Todo.ts` | `@role` decorator with `user_id` policy |
+| `src/hooks/AuthContext.tsx` | Auth state management (React context) |
+| `src/components/AuthPage.tsx` | Sign-in page |
+| `src/components/MockSignInDialog.tsx` | Local dev mock sign-in dialog |
+| `src/pages/AuthCallback.tsx` | Fabric Entra OAuth callback |
+| `src/services/ServiceContainer.ts` | Auth service auto-selection |
+| `src/services/rayfin/RayfinAuthService.ts` | Fabric auth service |
+| `src/services/rayfin/RayfinFabricAuthService.ts` | Fabric Entra provider |
+| `src/services/mock/MockAuthService.ts` | Local dev mock auth |
+| `src/services/interfaces/IAuthService.ts` | Auth service contract |
+
+## Project Structure
+
+```text
+getting-started-auth/
+├── rayfin/
+│   ├── data/
+│   │   ├── Todo.ts            # Todo entity with @role policy and user_id
+│   │   └── schema.ts          # Schema export for type safety
+│   └── rayfin.yml             # Rayfin configuration (auth and data enabled)
+├── src/
+│   ├── components/
+│   │   ├── ui/                # Radix-based UI components (shadcn)
+│   │   ├── AuthPage.tsx       # Fabric sign-in page
+│   │   ├── MockSignInDialog.tsx # Local dev mock sign-in dialog
+│   │   ├── TodoForm.tsx       # New task input
+│   │   ├── TodoItem.tsx       # Individual task with checkbox and delete
+│   │   └── TodoList.tsx       # Todo list container
+│   ├── hooks/
+│   │   ├── AuthContext.tsx    # Authentication state management
+│   │   ├── use-mobile.ts     # Mobile breakpoint hook
+│   │   └── useTodos.ts       # Todo CRUD operations hook
+│   ├── pages/
+│   │   ├── AuthCallback.tsx   # Fabric Entra OAuth callback
+│   │   └── Dashboard.tsx      # Main dashboard with milestones and todos
+│   ├── services/
+│   │   ├── interfaces/
+│   │   │   ├── IAuthService.ts    # Auth service contract
+│   │   │   └── ITodoService.ts    # Todo service contract
+│   │   ├── mock/
+│   │   │   └── MockAuthService.ts # Local dev mock auth
+│   │   ├── rayfin/
+│   │   │   ├── RayfinAuthService.ts       # Fabric auth service
+│   │   │   ├── RayfinFabricAuthService.ts # Fabric Entra provider
+│   │   │   ├── RayfinClientService.ts     # Rayfin client singleton
+│   │   │   └── RayfinTodoService.ts       # Todo data operations
+│   │   └── ServiceContainer.ts  # Service initialization with auth-mode detection
+│   ├── ErrorFallback.tsx      # Error boundary fallback UI
+│   ├── App.tsx                # Router with protected and public routes
+│   └── main.tsx               # Entry point with AuthProvider
+└── package.json
+```
+
+## Data Model
+
+The `Todo` entity uses Rayfin decorators with a role-based access policy.
+Each authenticated user can only access their own todos:
+
+```typescript
+@entity()
+@role('authenticated', '*', {
+  policy: (claims, item) => claims.sub.eq(item.user_id),
+})
+export class Todo {
+  @uuid() id!: string;
+  @text() title!: string;
+  @boolean() isCompleted!: boolean;
+  @date() createdAt!: Date;
+  @text() user_id!: string;
+}
+```
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev:fabric` | Start dev server against Fabric backend |
+| `npm run dev` | Deploy app to Fabric and start local dev server |
+| `npm run build` | Build for production |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests |
+| `npm run rayfin:up` | Deploy app to Fabric (no local dev server) |
+| `npm run rayfin:db` | Generate and apply database schema |
+
+## Environment Variables
+
+All Rayfin environment variables live in `rayfin/.env` using the `RAYFIN_PUBLIC_*` prefix.
+The `predev` hook runs `rayfin env --framework vite` to generate `.env.local` with Vite-compatible names.
+
+| Source (`rayfin/.env`) | Vite variable (`.env.local`) | Description | Default |
+| --- | --- | --- | --- |
+| `RAYFIN_PUBLIC_API_URL` | `VITE_RAYFIN_API_URL` | Rayfin backend URL | `http://localhost:5168` |
+| `RAYFIN_PUBLIC_PUBLISHABLE_KEY` | `VITE_RAYFIN_PUBLISHABLE_KEY` | Rayfin publishable key | (generated on dev) |
+| `RAYFIN_PUBLIC_ITEM_ID` | `VITE_FABRIC_ITEM_ID` | Fabric item/project ID (written by `rayfin up`) | -- |
+| `RAYFIN_PUBLIC_WORKSPACE_ID` | `VITE_FABRIC_WORKSPACE_ID` | Fabric workspace ID for auth | -- |
+| `RAYFIN_PUBLIC_PORTAL_URL` | `VITE_FABRIC_PORTAL_URL` | Fabric portal URL for auth | -- |
+
+Deployment metadata (including hosting URL) is stored in `rayfin/.deployments.json`.
+Use `rayfin up list` to view all deployments.
+
+## Next Steps
+
+For a more advanced example with categories, relationships, profile images, and dual mock/Rayfin service modes, see the [todo-app](../todo-app/) sample.
+
+## License
+
+See the [LICENSE](LICENSE) file for details.
