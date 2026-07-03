@@ -1,0 +1,53 @@
+name: 20 Deploy App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/NoiseCapture.Web/**"
+      - ".github/workflows/20_deploy_app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Restore
+        working-directory: src/NoiseCapture.Web
+        run: dotnet restore NoiseCapture.Web.csproj
+
+      - name: Publish
+        working-directory: src/NoiseCapture.Web
+        run: dotnet publish NoiseCapture.Web.csproj -c Release -o ${{ github.workspace }}/publish --no-restore
+
+      - name: Zip publish output
+        working-directory: ${{ github.workspace }}/publish
+        run: zip -r ${{ github.workspace }}/app.zip .
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp deploy \
+              --resource-group rg-${{ vars.PROJECT_NAME }} \
+              --name noisecap-web \
+              --src-path ${{ github.workspace }}/app.zip \
+              --type zip
