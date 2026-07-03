@@ -1,13 +1,26 @@
-# Getting Started with Auth
+# Sydney Harbour Ferry World
 
-A Rayfin todo app with Tailwind CSS, shadcn UI components, and Fabric Entra authentication.
-Each user owns their own todos via role-based access policies.
-Demonstrates a production-first workflow: deploy with `rayfin up`, then iterate locally with `npm run dev:fabric`.
+A Rayfin app with a **voxel frontend** that simulates a ferry cruising Sydney
+Harbour past its famous tourism sites. Built with three.js, Tailwind CSS,
+shadcn UI components, and Fabric Entra authentication.
+
+The harbour route and voxel landmarks are powered by a Rayfin `TourismSite`
+data entity. A voxel ferry loops the harbour, calling at each stop (Circular
+Quay, the Opera House, the Harbour Bridge, Taronga Zoo, Manly, and more) while
+the HUD highlights the site it is currently cruising past.
+
+Inspired by the isometric voxel style of the
+[zava-claims-agent](https://github.com/qkfang/zava-claims-agent/tree/main/src/frontend)
+demo (which uses Babylon.js); this app renders the scene with three.js.
 
 ## Features
 
-- **Todo Management**: Create, complete, and delete tasks backed by Rayfin Data API
-- **Milestone Seeding**: Pre-populated journey milestones on first load
+- **Voxel harbour scene**: An isometric three.js scene with a water plane,
+  voxel landmarks, and an animated ferry that loops the tourism route
+- **Rayfin-backed data**: Tourism sites are stored in the `TourismSite` entity
+  and seeded on first load; the scene falls back to built-in sites if no
+  backend is available yet
+- **Live HUD**: A route list highlights the stop the ferry is currently at
 - **Radix UI Components**: Production-ready components styled with Tailwind CSS v4
 - **Production-First Workflow**: Deploy first, develop against Fabric backend
 - **Authentication**: Fabric Entra SSO in production; mock email/password for local dev
@@ -106,8 +119,28 @@ getting-started-auth/
 
 ## Data Model
 
-The `Todo` entity uses Rayfin decorators with a role-based access policy.
-Each authenticated user can only access their own todos:
+Two Rayfin entities back the app.
+
+`TourismSite` holds the harbour route and voxel landmark data. It is shared
+reference data readable and seedable by any authenticated user:
+
+```typescript
+@entity()
+@authenticated('*')
+export class TourismSite {
+  @uuid() id!: string;
+  @text({ min: 1, max: 100 }) name!: string;
+  @text({ max: 300 }) description!: string;
+  @text({ max: 40 }) category!: string;
+  @int() routeOrder!: number;
+  @decimal() posX!: number;
+  @decimal() posZ!: number;
+  @text({ max: 20 }) color!: string;
+}
+```
+
+`Todo` remains from the starter template and uses a role-based access policy so
+each authenticated user can only access their own todos:
 
 ```typescript
 @entity()
@@ -116,12 +149,26 @@ Each authenticated user can only access their own todos:
 })
 export class Todo {
   @uuid() id!: string;
-  @text() title!: string;
+  @text({ min: 1, max: 100 }) title!: string;
   @boolean() isCompleted!: boolean;
   @date() createdAt!: Date;
   @text() user_id!: string;
 }
 ```
+
+## Voxel Harbour Scene
+
+The 3D scene is rendered with [three.js](https://threejs.org/) in an isometric
+voxel style.
+
+| File | Purpose |
+| --- | --- |
+| `src/components/HarbourScene.tsx` | three.js scene: water, voxel landmarks, animated ferry |
+| `src/components/SiteList.tsx` | HUD list of ferry-route stops |
+| `src/data/harbourSites.ts` | Default Sydney Harbour sites (seed + in-memory fallback) |
+| `src/hooks/useSites.ts` | Loads/seeds `TourismSite` records |
+| `src/pages/Dashboard.tsx` | Ferry-world view combining the scene and HUD |
+| `rayfin/data/TourismSite.ts` | `TourismSite` entity |
 
 ## Scripts
 

@@ -1,8 +1,10 @@
 import { IAuthService } from './interfaces/IAuthService';
+import { ISiteService } from './interfaces/ISiteService';
 import { ITodoService } from './interfaces/ITodoService';
 import { MockAuthService } from './mock/MockAuthService';
 import { RayfinAuthService } from './rayfin/RayfinAuthService';
 import { RayfinClientService } from './rayfin/RayfinClientService';
+import { RayfinSiteService } from './rayfin/RayfinSiteService';
 import { RayfinTodoService } from './rayfin/RayfinTodoService';
 
 function isLocalBackend(url: string): boolean {
@@ -19,10 +21,16 @@ export class ServiceContainer {
 
   public readonly authService: IAuthService;
   public readonly todoService: ITodoService;
+  public readonly siteService: ISiteService;
 
-  private constructor(authService: IAuthService, todoService: ITodoService) {
+  private constructor(
+    authService: IAuthService,
+    todoService: ITodoService,
+    siteService: ISiteService
+  ) {
     this.authService = authService;
     this.todoService = todoService;
+    this.siteService = siteService;
   }
 
   static create(): ServiceContainer {
@@ -65,7 +73,8 @@ export class ServiceContainer {
 
       ServiceContainer.instance = new ServiceContainer(
         authService,
-        new RayfinTodoService()
+        new RayfinTodoService(),
+        new RayfinSiteService()
       );
     }
 
