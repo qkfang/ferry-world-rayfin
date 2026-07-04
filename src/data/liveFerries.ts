@@ -13,6 +13,7 @@ export type SeedFerry = Omit<FerryVessel, 'id' | 'updatedAt'>;
 
 export const DEFAULT_FERRIES: SeedFerry[] = [
   {
+    // Off Bennelong Point, steaming north-east toward Manly.
     name: 'Freshwater',
     routeName: 'F1 Manly',
     posX: 4,
@@ -21,6 +22,7 @@ export const DEFAULT_FERRIES: SeedFerry[] = [
     color: '#1f6f4a',
   },
   {
+    // Near Barangaroo on the western shore, heading back south.
     name: 'Fishburn',
     routeName: 'F4 Cross Harbour',
     posX: -8,
@@ -29,6 +31,7 @@ export const DEFAULT_FERRIES: SeedFerry[] = [
     color: '#c2402f',
   },
   {
+    // Out past Fort Denison in the inner harbour, running east.
     name: 'Catherine Hamlin',
     routeName: 'F9 Watsons Bay',
     posX: 20,

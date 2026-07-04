@@ -17,6 +17,9 @@ const SCALE = 1.35;
 const WATER_LEVEL = 0;
 const FERRY_SPEED = 7; // world units per second (fallback route loop)
 const DWELL_SECONDS = 1.4; // pause time at each stop (fallback route loop)
+// How quickly a live ferry eases toward its latest reported position. Higher =
+// snappier; lower = smoother. Scaled by frame delta so it is frame-rate stable.
+const FERRY_LERP_SPEED = 1.6;
 
 /** Build a simple voxel box mesh. */
 function box(
@@ -561,7 +564,7 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
         syncLiveFerries(vessels!);
         let lead: THREE.Vector3 | null = null;
         for (const entry of liveFerries.values()) {
-          entry.current.lerp(entry.target, Math.min(1, delta * 1.6));
+          entry.current.lerp(entry.target, Math.min(1, delta * FERRY_LERP_SPEED));
           entry.group.position.set(
             entry.current.x,
             WATER_LEVEL + 0.1 + Math.sin(elapsed * 2.2) * 0.08,

@@ -72,6 +72,8 @@ export function useFerries(): UseFerriesResult {
         setUsingLiveData(true);
         return;
       }
+      // Empty response and errors are treated the same on purpose: the harbour
+      // should never look deserted, so we fall through to the local sim.
     } catch {
       // Backend unavailable (e.g. before the first deploy) — use the sim.
     }
