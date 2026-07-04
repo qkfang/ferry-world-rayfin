@@ -5,6 +5,7 @@ import { SiteList } from '@/components/SiteList';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/AuthContext';
+import { useFerries } from '@/hooks/useFerries';
 import { useSites } from '@/hooks/useSites';
 
 import type { TourismSite } from '../../rayfin/data/TourismSite';
@@ -17,6 +18,7 @@ const HarbourScene = lazy(() =>
 export function Dashboard() {
   const { user, signOut } = useAuth();
   const { sites, loading, error, usingFallback } = useSites();
+  const { ferries, usingLiveData } = useFerries();
   const [currentSiteId, setCurrentSiteId] = useState<string | null>(null);
 
   const handleSignOut = async () => {
@@ -74,7 +76,7 @@ export function Dashboard() {
                 </div>
               }
             >
-              <HarbourScene sites={sites} onArrive={handleArrive} />
+              <HarbourScene sites={sites} ferries={ferries} onArrive={handleArrive} />
             </Suspense>
           )}
 
@@ -85,6 +87,21 @@ export function Dashboard() {
             <p className="text-lg font-bold text-amber-300">
               {currentSite ? currentSite.name : 'Setting sail...'}
             </p>
+          </div>
+
+          <div className="pointer-events-none absolute right-4 top-4 flex items-center gap-2 rounded-full bg-slate-950/60 px-3 py-1.5 backdrop-blur">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                usingLiveData
+                  ? 'animate-pulse bg-emerald-400'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-xs font-semibold text-white/80">
+              {usingLiveData
+                ? `${ferries.length} live ferries from Fabric`
+                : 'Simulated ferry feed'}
+            </span>
           </div>
         </section>
 

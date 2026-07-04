@@ -1,9 +1,11 @@
 import { IAuthService } from './interfaces/IAuthService';
+import { IFerryService } from './interfaces/IFerryService';
 import { ISiteService } from './interfaces/ISiteService';
 import { ITodoService } from './interfaces/ITodoService';
 import { MockAuthService } from './mock/MockAuthService';
 import { RayfinAuthService } from './rayfin/RayfinAuthService';
 import { RayfinClientService } from './rayfin/RayfinClientService';
+import { RayfinFerryService } from './rayfin/RayfinFerryService';
 import { RayfinSiteService } from './rayfin/RayfinSiteService';
 import { RayfinTodoService } from './rayfin/RayfinTodoService';
 
@@ -22,15 +24,18 @@ export class ServiceContainer {
   public readonly authService: IAuthService;
   public readonly todoService: ITodoService;
   public readonly siteService: ISiteService;
+  public readonly ferryService: IFerryService;
 
   private constructor(
     authService: IAuthService,
     todoService: ITodoService,
-    siteService: ISiteService
+    siteService: ISiteService,
+    ferryService: IFerryService
   ) {
     this.authService = authService;
     this.todoService = todoService;
     this.siteService = siteService;
+    this.ferryService = ferryService;
   }
 
   static create(): ServiceContainer {
@@ -74,7 +79,8 @@ export class ServiceContainer {
       ServiceContainer.instance = new ServiceContainer(
         authService,
         new RayfinTodoService(),
-        new RayfinSiteService()
+        new RayfinSiteService(),
+        new RayfinFerryService()
       );
     }
 

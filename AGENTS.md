@@ -7,8 +7,10 @@ This project ships agent context: skills under `.agents/skills/` and MCP servers
 React + TypeScript (Vite) app backed by **Project Rayfin** with a **voxel
 (three.js) frontend** that simulates a ferry cruising Sydney Harbour past its
 tourism sites. Radix-based UI components are styled with Tailwind CSS.
-The harbour route and voxel landmarks are driven by the `TourismSite` entity;
-Fabric Entra authentication is enabled by default.
+The harbour route and voxel landmarks are driven by the `TourismSite` entity,
+and the ferries are positioned from the `FerryVessel` entity (live ferry
+locations, with a simulated fallback); Fabric Entra authentication is enabled
+by default.
 Auth is fully integrated: local dev uses a mock email/password flow, production uses Fabric Entra SSO.
 
 ## Repo map
@@ -16,12 +18,12 @@ Auth is fully integrated: local dev uses a mock email/password flow, production 
 - `src/` – React UI
 - `src/components/ui/` – Radix-based UI components (shadcn)
 - `src/components/` – App components (HarbourScene voxel view, SiteList, TodoForm, TodoList, AuthPage, MockSignInDialog)
-- `src/data/` – Frontend seed/fallback data (harbourSites)
-- `src/hooks/` – React hooks (useSites, useTodos, AuthContext)
+- `src/data/` – Frontend seed/fallback data (harbourSites, liveFerries)
+- `src/hooks/` – React hooks (useSites, useFerries, useTodos, AuthContext)
 - `src/pages/` – Page components (Dashboard ferry-world view, AuthCallback)
 - `src/services/` – Service layer (ServiceContainer, Rayfin services, auth services)
 - `rayfin/rayfin.yml` – Rayfin configuration (auth and data enabled)
-- `rayfin/data/` – Entities (TourismSite, Todo; export from `rayfin/data/schema.ts`)
+- `rayfin/data/` – Entities (TourismSite, FerryVessel, Todo; export from `rayfin/data/schema.ts`)
 
 ## UI (Radix-based shadcn/ui)
 
@@ -46,6 +48,7 @@ Key config/files:
 - **RayfinClientService**: Manages the RayfinClient singleton instance
 - **RayfinTodoService**: Todo CRUD via DataApi fluent interface
 - **RayfinSiteService**: TourismSite reads/seeding via DataApi fluent interface
+- **RayfinFerryService**: FerryVessel reads (live ferry positions) via DataApi fluent interface
 
 ### Auth Service Layer
 
@@ -63,10 +66,12 @@ Key config/files:
 ### Key files
 
 - `rayfin/data/TourismSite.ts` – Harbour tourism-site entity (`@authenticated('*')`)
+- `rayfin/data/FerryVessel.ts` – Live ferry-position entity (`@authenticated('*')`)
 - `rayfin/data/Todo.ts` – Entity with `@role` decorator and `user_id` policy
-- `src/components/HarbourScene.tsx` – Voxel three.js harbour scene with animated ferry
+- `src/components/HarbourScene.tsx` – Voxel three.js harbour scene: animated water/sky/ambient life; ferries driven by live FerryVessel data with a looping-route fallback
 - `src/services/ServiceContainer.ts` – Service initialization with auth-mode detection
 - `src/hooks/useSites.ts` – Loads/seeds tourism sites with in-memory fallback
+- `src/hooks/useFerries.ts` – Polls live ferry positions with a simulated fallback
 - `src/hooks/useTodos.ts` – Todo operations hook with milestone seeding
 - `src/pages/Dashboard.tsx` – Ferry-world view: voxel scene + route HUD
 

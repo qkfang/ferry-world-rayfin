@@ -5,9 +5,12 @@ Harbour past its famous tourism sites. Built with three.js, Tailwind CSS,
 shadcn UI components, and Fabric Entra authentication.
 
 The harbour route and voxel landmarks are powered by a Rayfin `TourismSite`
-data entity. A voxel ferry loops the harbour, calling at each stop (Circular
-Quay, the Opera House, the Harbour Bridge, Taronga Zoo, Manly, and more) while
-the HUD highlights the site it is currently cruising past.
+data entity, and the ferries themselves are driven by a `FerryVessel` entity
+that holds live vessel positions. When the backend has live positions the
+voxel ferries mirror them; otherwise a single ferry loops the harbour, calling
+at each stop (Circular Quay, the Opera House, the Harbour Bridge, Taronga Zoo,
+Manly, and more) while the HUD highlights the site it is currently cruising
+past.
 
 Inspired by the isometric voxel style of the
 [zava-claims-agent](https://github.com/qkfang/zava-claims-agent/tree/main/src/frontend)
@@ -15,12 +18,19 @@ demo (which uses Babylon.js); this app renders the scene with three.js.
 
 ## Features
 
-- **Voxel harbour scene**: An isometric three.js scene with a water plane,
-  voxel landmarks, and an animated ferry that loops the tourism route
+- **Dynamic voxel harbour scene**: An isometric three.js scene with animated
+  low-poly water, drifting clouds and a sun, circling seagulls, ambient
+  sailboats, and detailed voxel landmarks (bespoke Opera House sails and a
+  stepped Harbour Bridge arch with hangers)
+- **Live ferries from Fabric**: Ferries are positioned from the `FerryVessel`
+  entity, polled from the backend; the scene smoothly interpolates each vessel
+  to its reported position and orients it to its heading. Falls back to a
+  simulated feed (and a looping route ferry) when no backend is available
 - **Rayfin-backed data**: Tourism sites are stored in the `TourismSite` entity
   and seeded on first load; the scene falls back to built-in sites if no
   backend is available yet
-- **Live HUD**: A route list highlights the stop the ferry is currently at
+- **Live HUD**: A route list highlights the stop the lead ferry is nearest to,
+  plus a live/simulated feed indicator
 - **Radix UI Components**: Production-ready components styled with Tailwind CSS v4
 - **Production-First Workflow**: Deploy first, develop against Fabric backend
 - **Authentication**: Fabric Entra SSO in production; mock email/password for local dev
@@ -119,7 +129,7 @@ getting-started-auth/
 
 ## Data Model
 
-Two Rayfin entities back the app.
+Three Rayfin entities back the app.
 
 `TourismSite` holds the harbour route and voxel landmark data. It is shared
 reference data readable and seedable by any authenticated user:
@@ -136,6 +146,26 @@ export class TourismSite {
   @decimal() posX!: number;
   @decimal() posZ!: number;
   @text({ max: 20 }) color!: string;
+}
+```
+
+`FerryVessel` holds the live position of each ferry cruising the harbour. A
+backend feed (e.g. Transport for NSW real-time positions) keeps these rows
+updated in the same scene-grid space as `TourismSite`, and the scene drives a
+voxel ferry to each vessel's reported position:
+
+```typescript
+@entity()
+@authenticated('*')
+export class FerryVessel {
+  @uuid() id!: string;
+  @text({ min: 1, max: 100 }) name!: string;
+  @text({ max: 60 }) routeName!: string;
+  @decimal() posX!: number;
+  @decimal() posZ!: number;
+  @decimal() heading!: number;
+  @text({ max: 20 }) color!: string;
+  @date() updatedAt!: Date;
 }
 ```
 
@@ -163,12 +193,15 @@ voxel style.
 
 | File | Purpose |
 | --- | --- |
-| `src/components/HarbourScene.tsx` | three.js scene: water, voxel landmarks, animated ferry |
+| `src/components/HarbourScene.tsx` | three.js scene: animated water, sky, ambient life, voxel landmarks, live/looping ferries |
 | `src/components/SiteList.tsx` | HUD list of ferry-route stops |
 | `src/data/harbourSites.ts` | Default Sydney Harbour sites (seed + in-memory fallback) |
+| `src/data/liveFerries.ts` | Fallback/simulated live ferry positions |
 | `src/hooks/useSites.ts` | Loads/seeds `TourismSite` records |
+| `src/hooks/useFerries.ts` | Polls `FerryVessel` positions (simulated fallback) |
 | `src/pages/Dashboard.tsx` | Ferry-world view combining the scene and HUD |
 | `rayfin/data/TourismSite.ts` | `TourismSite` entity |
+| `rayfin/data/FerryVessel.ts` | `FerryVessel` entity (live ferry positions) |
 
 ## Scripts
 
