@@ -154,11 +154,21 @@ function createSailboat(): THREE.Group {
   const group = new THREE.Group();
   const hull = box(1.4, 0.4, 0.6, '#e8e2d5');
   hull.position.y = 0.2;
+  // Blue trim stripe and a small open cockpit.
+  const trim = box(1.42, 0.12, 0.62, '#3a6ea5', { flat: true });
+  trim.position.y = 0.34;
+  const cockpit = box(0.5, 0.16, 0.36, '#6b4a2b', { flat: true });
+  cockpit.position.set(-0.2, 0.46, 0);
   const mast = box(0.12, 1.6, 0.12, '#8a6a3a');
   mast.position.y = 1;
+  const boom = box(0.9, 0.08, 0.08, '#8a6a3a', { flat: true });
+  boom.position.set(-0.25, 0.6, 0);
   const sail = box(0.1, 1.1, 0.9, '#f4f1e8');
   sail.position.set(0.05, 1.05, 0.15);
-  group.add(hull, mast, sail);
+  // A smaller front jib sail.
+  const jib = box(0.08, 0.8, 0.5, '#ece4d4');
+  jib.position.set(0.5, 0.95, 0);
+  group.add(hull, trim, cockpit, mast, boom, sail, jib);
   return group;
 }
 
@@ -172,6 +182,176 @@ function createSeagull(): THREE.Group {
   right.position.x = 0.35;
   right.rotation.z = -0.4;
   group.add(left, right);
+  return group;
+}
+
+/**
+ * A detailed voxel skyscraper: a tapering, setback tower with tinted glass
+ * facades, banded window floors and a little rooftop plant/antenna, so the CBD
+ * reads as a dense 3D city rather than plain blocks.
+ */
+function createSkyscraper(
+  height: number,
+  footprint: number,
+  rand: () => number
+): THREE.Group {
+  const group = new THREE.Group();
+  const glassTints = ['#5f7d92', '#6d8ea3', '#7fa2b5', '#8aa7ad', '#9fb4bf'];
+  const tint = glassTints[Math.floor(rand() * glassTints.length)];
+
+  // Stack a few setback sections, each narrower than the one below it.
+  const sections = 1 + Math.floor(rand() * 3);
+  let base = 0;
+  let w = footprint;
+  let d = footprint;
+  for (let s = 0; s < sections; s++) {
+    const segH = height * (0.28 + rand() * 0.2);
+    const body = box(w, segH, d, tint, { flat: true });
+    body.position.y = base + segH / 2;
+    group.add(body);
+
+    // Window bands: thin darker slabs stacked up the facade catch the light.
+    const floors = Math.max(1, Math.floor(segH / 0.9));
+    for (let f = 0; f < floors; f++) {
+      const band = box(w * 1.01, 0.18, d * 1.01, '#2f4653', {
+        flat: true,
+        opacity: 0.85,
+      });
+      band.position.y = base + (segH / (floors + 1)) * (f + 1);
+      group.add(band);
+    }
+
+    base += segH;
+    w *= 0.72 + rand() * 0.12;
+    d *= 0.72 + rand() * 0.12;
+  }
+
+  // Rooftop detail: a plant room plus a thin antenna mast.
+  const cap = box(w * 0.6, 0.4, d * 0.6, '#54606b', { flat: true });
+  cap.position.y = base + 0.2;
+  group.add(cap);
+  if (rand() > 0.4) {
+    const antenna = box(0.12, height * 0.2, 0.12, '#c94f3d', { flat: true });
+    antenna.position.y = base + 0.4 + height * 0.1;
+    group.add(antenna);
+  }
+  // Ground-floor lobby: a slightly wider, brighter podium with an entrance.
+  const podium = box(footprint * 1.12, 0.8, footprint * 1.12, '#c8cdd2', {
+    flat: true,
+  });
+  podium.position.y = 0.4;
+  group.add(podium);
+  const entrance = box(footprint * 0.4, 0.5, footprint * 1.16, '#2b3d47', {
+    flat: true,
+    opacity: 0.9,
+  });
+  entrance.position.y = 0.28;
+  group.add(entrance);
+  return group;
+}
+
+/**
+ * Sydney Tower: the CBD's tallest landmark. A slim shaft rising to a golden
+ * observation turret crowned with a spire.
+ */
+function createSydneyTower(): THREE.Group {
+  const group = new THREE.Group();
+  const shaft = box(0.7, 11, 0.7, '#d8d2c4', { flat: true });
+  shaft.position.y = 5.5;
+  const turret = box(1.8, 1.6, 1.8, '#e0b23c', { flat: true });
+  turret.position.y = 11.4;
+  const turretTop = box(1.3, 0.7, 1.3, '#caa032', { flat: true });
+  turretTop.position.y = 12.5;
+  const spire = box(0.16, 3.4, 0.16, '#b9b3a5', { flat: true });
+  spire.position.y = 14.6;
+  group.add(shaft, turret, turretTop, spire);
+  return group;
+}
+
+/** A small suburban voxel house with walls and a pitched roof. */
+function createHouse(rand: () => number): THREE.Group {
+  const group = new THREE.Group();
+  const wallColors = ['#e6ddcf', '#dccdb4', '#cfd6da', '#e2cbb2', '#d3c3a6'];
+  const roofColors = ['#a8462f', '#8a5a3b', '#6d7a82', '#94533a'];
+  const wallH = 0.8 + rand() * 0.5;
+  const w = 1 + rand() * 0.5;
+  const d = 1 + rand() * 0.5;
+  const walls = box(w, wallH, d, wallColors[Math.floor(rand() * wallColors.length)], {
+    flat: true,
+  });
+  walls.position.y = wallH / 2;
+  const roof = box(w * 1.12, 0.4, d * 1.12, roofColors[Math.floor(rand() * roofColors.length)], {
+    flat: true,
+  });
+  roof.position.y = wallH + 0.2;
+  roof.rotation.z = 0.16;
+  group.add(walls, roof);
+  // Front door and a pair of windows so houses read as lived-in.
+  const door = box(0.22, wallH * 0.55, 0.06, '#6b4a2b', { flat: true });
+  door.position.set(0, (wallH * 0.55) / 2, d / 2 + 0.02);
+  group.add(door);
+  [-w * 0.28, w * 0.28].forEach((wx) => {
+    const win = box(0.26, 0.26, 0.06, '#9fc4d6', { flat: true, opacity: 0.9 });
+    win.position.set(wx, wallH * 0.62, d / 2 + 0.02);
+    group.add(win);
+  });
+  // Occasional chimney or a small garden tree beside the house.
+  if (rand() > 0.6) {
+    const chimney = box(0.24, 0.6, 0.24, '#8a6a54', { flat: true });
+    chimney.position.set(w * 0.3, wallH + 0.5, 0);
+    group.add(chimney);
+  } else if (rand() > 0.5) {
+    const shrub = box(0.5, 0.5, 0.5, '#3f7a3a', { flat: true });
+    shrub.position.set(w * 0.7, 0.25, d * 0.6);
+    group.add(shrub);
+  }
+  return group;
+}
+
+/**
+ * A mid-rise apartment / office block: a flat-roofed building with banded
+ * window floors and a small rooftop parapet. Fills the inner-city ring between
+ * the tall CBD towers and the low suburban houses so the map reads as a full
+ * gradient of density.
+ */
+function createMidRise(rand: () => number): THREE.Group {
+  const group = new THREE.Group();
+  const facades = ['#c7bfae', '#b7c2c7', '#cabca6', '#a9b3b0', '#d0c6b4'];
+  const facade = facades[Math.floor(rand() * facades.length)];
+  const w = SCALE * (0.55 + rand() * 0.3);
+  const d = SCALE * (0.55 + rand() * 0.3);
+  const h = 1.6 + rand() * 3;
+  const body = box(w, h, d, facade, { flat: true });
+  body.position.y = h / 2;
+  group.add(body);
+
+  // Stacked window bands up the facade.
+  const floors = Math.max(1, Math.floor(h / 0.8));
+  for (let f = 0; f < floors; f++) {
+    const band = box(w * 1.02, 0.16, d * 1.02, '#41525c', {
+      flat: true,
+      opacity: 0.85,
+    });
+    band.position.y = (h / (floors + 1)) * (f + 1);
+    group.add(band);
+  }
+
+  // Flat roof parapet plus an occasional rooftop water tank / stair box.
+  const parapet = box(w * 1.04, 0.2, d * 1.04, '#8f8778', { flat: true });
+  parapet.position.y = h + 0.1;
+  group.add(parapet);
+  // Ground-floor shopfront/awning band gives street-level activity.
+  const shopfront = box(w * 1.04, 0.5, d * 1.04, '#3a4a52', { flat: true, opacity: 0.9 });
+  shopfront.position.y = 0.28;
+  group.add(shopfront);
+  const awning = box(w * 1.16, 0.1, d * 1.16, '#b25a43', { flat: true });
+  awning.position.y = 0.6;
+  group.add(awning);
+  if (rand() > 0.5) {
+    const tank = box(w * 0.35, 0.5, d * 0.35, '#6f6a5f', { flat: true });
+    tank.position.set((rand() - 0.5) * w * 0.4, h + 0.35, (rand() - 0.5) * d * 0.4);
+    group.add(tank);
+  }
   return group;
 }
 
@@ -272,20 +452,91 @@ function createLandscape(sites: TourismSite[]): THREE.Group {
     group.add(trunks, canopies);
   }
 
-  // A small CBD skyline on the southern city shore behind Circular Quay.
-  const cbd = inland.filter((c) => c.z >= 7 && c.x >= -16 && c.x <= 4);
+  // A denser, more detailed CBD skyline on the southern city shore behind
+  // Circular Quay: setback glass towers of varied height, crowned by the
+  // landmark Sydney Tower rising above the cluster.
+  const isCbd = (c: LandCell) => c.z >= 7 && c.x >= -16 && c.x <= 4;
+  const cbd = inland.filter(isCbd);
+  let tallest: LandCell | null = null;
   for (const cell of cbd) {
-    if (rand() > 0.35) continue;
-    const h = 3 + rand() * 6;
-    const tower = box(
-      SCALE * 0.7,
-      h,
-      SCALE * 0.7,
-      rand() > 0.5 ? '#b9c2cc' : '#8fa0ad',
-      { flat: true }
-    );
-    tower.position.set(cell.x * SCALE, top + h / 2, cell.z * SCALE);
+    if (rand() > 0.72) continue; // denser CBD than before
+    const h = 3 + rand() * 8;
+    const footprint = SCALE * (0.55 + rand() * 0.35);
+    const tower = createSkyscraper(h, footprint, rand);
+    tower.position.set(cell.x * SCALE, top, cell.z * SCALE);
     group.add(tower);
+    if (!tallest || h > tallest.height) {
+      tallest = { ...cell, height: h };
+    }
+  }
+  if (tallest) {
+    const sydneyTower = createSydneyTower();
+    sydneyTower.position.set(tallest.x * SCALE, top, tallest.z * SCALE);
+    group.add(sydneyTower);
+  }
+
+  // A street grid over the flatter inland cells: thin dark asphalt strips laid
+  // along every few grid lines so the whole map reads as a laid-out city, not
+  // loose scenery. Drawn as one instanced mesh (a single draw call).
+  const roadCells = inland.filter(
+    (c) => c.height < 1.6 && (((c.x % 3) + 3) % 3 === 0 || ((c.z % 3) + 3) % 3 === 0)
+  );
+  if (roadCells.length > 0) {
+    const roadGeo = new THREE.BoxGeometry(SCALE * 1.02, 0.08, SCALE * 1.02);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: '#4a4d52',
+      roughness: 1,
+      metalness: 0,
+      flatShading: true,
+    });
+    const roads = new THREE.InstancedMesh(roadGeo, roadMat, roadCells.length);
+    roadCells.forEach((cell, i) => {
+      matrix.makeScale(1, 1, 1);
+      matrix.setPosition(cell.x * SCALE, top + 0.05, cell.z * SCALE);
+      roads.setMatrixAt(i, matrix);
+    });
+    roads.instanceMatrix.needsUpdate = true;
+    group.add(roads);
+  }
+
+  // Inner-city ring: mid-rise apartment / office blocks in the belt just
+  // outside the CBD (and along the harbour foreshore), giving a density
+  // gradient from towers down to houses.
+  const midRise = inland.filter(
+    (c) =>
+      !isCbd(c) &&
+      c.x >= -22 &&
+      c.x <= 10 &&
+      c.z >= 1 &&
+      c.z <= 14 &&
+      rand() < 0.14
+  );
+  for (const cell of midRise.slice(0, 90)) {
+    const block = createMidRise(rand);
+    block.position.set(
+      cell.x * SCALE + (rand() - 0.5) * 0.4,
+      top,
+      cell.z * SCALE + (rand() - 0.5) * 0.4
+    );
+    block.rotation.y = (Math.floor(rand() * 4) * Math.PI) / 2;
+    group.add(block);
+  }
+
+  // Scatter low suburban houses over the remaining inland shore so the
+  // surrounding suburbs read as a lived-in city that fills the whole map,
+  // not empty bushland.
+  const suburb = inland.filter(
+    (c) => !isCbd(c) && !(c.x >= -22 && c.x <= 10 && c.z >= 1 && c.z <= 14) && rand() < 0.16
+  );
+  for (const cell of suburb.slice(0, 360)) {
+    const house = createHouse(rand);
+    house.position.set(
+      cell.x * SCALE + (rand() - 0.5),
+      top,
+      cell.z * SCALE + (rand() - 0.5)
+    );
+    house.rotation.y = rand() * Math.PI;
+    group.add(house);
   }
 
   return group;
@@ -334,8 +585,8 @@ function createLandmark(site: TourismSite): THREE.Group {
       }
     });
   } else if (name.includes('bridge')) {
-    // Sydney Harbour Bridge: two stone pylon pairs, a smooth stepped steel
-    // arch, hangers, and a road deck spanning the water.
+    // Sydney Harbour Bridge: two stone pylon pairs, a twin-chord steel arch
+    // with lattice cross-bracing, hangers, and a railed road deck.
     const pylons: [number, number][] = [
       [-3, -0.7],
       [-3, 0.7],
@@ -346,26 +597,52 @@ function createLandmark(site: TourismSite): THREE.Group {
       const pylon = box(0.7, 3.6, 0.7, '#cfc8bb');
       pylon.position.set(x, 2, z);
       group.add(pylon);
+      // Stone pylon cap + flagpole for landmark detail.
+      const cap = box(0.85, 0.3, 0.85, '#b7ad9c', { flat: true });
+      cap.position.set(x, 3.9, z);
+      group.add(cap);
     });
-    const steps = 13;
+    const steps = 17;
+    const chordZ = [-0.55, 0.55];
     for (let i = 0; i < steps; i++) {
       const t = i / (steps - 1);
       const x = (t - 0.5) * 6;
       const y = 2.4 + Math.sin(t * Math.PI) * 2.4;
-      const seg = box(0.6, 0.4, 0.5, color);
-      seg.position.set(x, y, 0);
-      group.add(seg);
-      // Vertical hangers from arch down to the deck.
+      // Two parallel arch chords (front and back).
+      chordZ.forEach((z) => {
+        const seg = box(0.55, 0.36, 0.28, color);
+        seg.position.set(x, y, z);
+        group.add(seg);
+      });
+      // Diagonal lattice cross-bracing between the chords.
+      if (i % 2 === 0) {
+        const brace = box(0.12, 0.12, 1.2, '#7f8a84', { flat: true });
+        brace.position.set(x, y, 0);
+        brace.rotation.x = i % 4 === 0 ? 0.5 : -0.5;
+        group.add(brace);
+      }
+      // Vertical hangers from each arch chord down to the deck.
       if (i % 2 === 0) {
         const drop = y - 2.3;
-        const hanger = box(0.08, drop, 0.08, '#8f8a80');
-        hanger.position.set(x, 2.3 + drop / 2, 0);
-        group.add(hanger);
+        chordZ.forEach((z) => {
+          const hanger = box(0.08, drop, 0.08, '#8f8a80');
+          hanger.position.set(x, 2.3 + drop / 2, z);
+          group.add(hanger);
+        });
       }
     }
-    const deck = box(6.4, 0.3, 1, '#5c5c5c');
+    const deck = box(6.4, 0.3, 1.4, '#5c5c5c');
     deck.position.set(0, 2.3, 0);
     group.add(deck);
+    // Deck railings down each side and a centre lane line.
+    [-0.62, 0.62].forEach((z) => {
+      const rail = box(6.4, 0.16, 0.06, '#b7ad9c', { flat: true });
+      rail.position.set(0, 2.55, z);
+      group.add(rail);
+    });
+    const laneLine = box(6.4, 0.02, 0.08, '#d8cf5a', { flat: true });
+    laneLine.position.set(0, 2.46, 0);
+    group.add(laneLine);
   } else if (name.includes('luna')) {
     // Amusement-park face arch + a little tower.
     const arch = box(3, 0.6, 0.6, color);
@@ -433,17 +710,56 @@ function createFerry(hullColor: THREE.ColorRepresentation): THREE.Group {
   const group = new THREE.Group();
   const hull = box(3.4, 0.9, 1.6, hullColor);
   hull.position.y = 0.45;
+  // Green waterline stripe below the white superstructure band.
+  const waterline = box(3.44, 0.18, 1.64, '#123f2a', { flat: true });
+  waterline.position.y = 0.12;
   const hullTop = box(3.4, 0.5, 1.6, '#f2f0e6');
   hullTop.position.y = 1.1;
+  // Row of passenger windows along the lower saloon.
+  const lowerWindows = box(2.9, 0.22, 1.64, '#38566b', { flat: true, opacity: 0.9 });
+  lowerWindows.position.y = 1.12;
   const cabin = box(2, 0.9, 1.2, '#ffffff');
   cabin.position.set(-0.2, 1.75, 0);
+  // Upper-deck windows wrapping the cabin.
+  const cabinWindows = box(2.02, 0.34, 1.22, '#38566b', { flat: true, opacity: 0.9 });
+  cabinWindows.position.set(-0.2, 1.75, 0);
   const roof = box(2.1, 0.2, 1.3, hullColor);
   roof.position.set(-0.2, 2.3, 0);
   const funnel = box(0.5, 0.9, 0.5, '#d9b641');
   funnel.position.set(-1, 2.6, 0);
+  const funnelCap = box(0.6, 0.16, 0.6, '#3a3a3a', { flat: true });
+  funnelCap.position.set(-1, 3.05, 0);
   const bow = box(0.8, 0.9, 1.2, hullColor);
   bow.position.set(1.9, 0.5, 0);
-  group.add(hull, hullTop, cabin, roof, funnel, bow);
+  // Open bow deck with side railings so it reads as a real vessel.
+  const deck = box(1.1, 0.1, 1.3, '#c9a978', { flat: true });
+  deck.position.set(1.4, 0.95, 0);
+  const railL = box(1.2, 0.24, 0.06, '#e8e2d5', { flat: true });
+  railL.position.set(1.4, 1.1, 0.62);
+  const railR = box(1.2, 0.24, 0.06, '#e8e2d5', { flat: true });
+  railR.position.set(1.4, 1.1, -0.62);
+  // Wheelhouse mast with a small navigation light.
+  const mast = box(0.1, 0.7, 0.1, '#8f8a80', { flat: true });
+  mast.position.set(0.5, 2.75, 0);
+  const navLight = box(0.16, 0.16, 0.16, '#e2503b', { flat: true });
+  navLight.position.set(0.5, 3.15, 0);
+  group.add(
+    hull,
+    waterline,
+    hullTop,
+    lowerWindows,
+    cabin,
+    cabinWindows,
+    roof,
+    funnel,
+    funnelCap,
+    bow,
+    deck,
+    railL,
+    railR,
+    mast,
+    navLight
+  );
   return group;
 }
 
@@ -513,21 +829,44 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
     const size = boundsBox.getSize(new THREE.Vector3());
     const span = Math.max(size.x, size.z) + 16;
 
-    // Animated low-poly water surface.
+    // Animated low-poly water surface with per-vertex colouring so wave crests
+    // pick up sunlit teal and foam highlights for a more realistic harbour.
     const waterSize = span * 1.8;
-    const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, 32, 32);
+    const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, 64, 64);
     waterGeo.rotateX(-Math.PI / 2);
+    const waterVertexCount = waterGeo.attributes.position.count;
+    waterGeo.setAttribute(
+      'color',
+      new THREE.BufferAttribute(new Float32Array(waterVertexCount * 3), 3)
+    );
     const waterMat = new THREE.MeshStandardMaterial({
-      color: '#2f7cad',
-      roughness: 0.85,
-      metalness: 0.1,
+      vertexColors: true,
+      roughness: 0.6,
+      metalness: 0.25,
       flatShading: true,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.95,
     });
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.position.set(center.x, WATER_LEVEL - 0.15, center.z);
     scene.add(water);
+    // Palette used to tint the water between deep troughs, mid teal and foam.
+    const waterDeep = new THREE.Color('#1c5f8f');
+    const waterMid = new THREE.Color('#2f7cad');
+    const waterFoam = new THREE.Color('#bfe6f0');
+
+    // A darker, still seabed plane below the surface adds depth through the
+    // semi-transparent water rather than showing empty background.
+    const seabedGeo = new THREE.PlaneGeometry(waterSize, waterSize);
+    seabedGeo.rotateX(-Math.PI / 2);
+    const seabedMat = new THREE.MeshStandardMaterial({
+      color: '#124158',
+      roughness: 1,
+      flatShading: true,
+    });
+    const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+    seabed.position.set(center.x, WATER_LEVEL - 1.2, center.z);
+    scene.add(seabed);
 
     // Voxel landscape: the harbour's surrounding shores, hills, and islands.
     scene.add(createLandscape(sites));
@@ -700,22 +1039,39 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
     const clock = new THREE.Clock();
     let frameId = 0;
     const waterPos = waterGeo.attributes.position;
+    const waterColor = waterGeo.attributes.color as THREE.BufferAttribute;
+    const waveTint = new THREE.Color();
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.05);
       const elapsed = clock.elapsedTime;
 
-      // Ripple the water surface.
+      // Ripple the water surface with layered swell + chop, and tint each
+      // vertex from deep trough to foamy crest for a livelier harbour.
       for (let i = 0; i < waterPos.count; i++) {
         const x = waterPos.getX(i);
         const z = waterPos.getZ(i);
-        const y =
-          Math.sin(x * 0.15 + elapsed * 1.1) * 0.28 +
-          Math.cos(z * 0.19 + elapsed * 0.9) * 0.22;
+        const swell =
+          Math.sin(x * 0.12 + elapsed * 0.9) * 0.3 +
+          Math.cos(z * 0.16 + elapsed * 0.75) * 0.24;
+        const chop =
+          Math.sin(x * 0.42 + z * 0.31 + elapsed * 1.8) * 0.09 +
+          Math.cos(x * 0.27 - z * 0.35 + elapsed * 2.3) * 0.07;
+        const y = swell + chop;
         waterPos.setY(i, y);
+
+        // Map wave height to a colour: troughs deep, crests foamy.
+        const h = (y + 0.5) / 1.0; // roughly 0..1
+        if (h < 0.5) {
+          waveTint.copy(waterDeep).lerp(waterMid, Math.max(0, h * 2));
+        } else {
+          waveTint.copy(waterMid).lerp(waterFoam, Math.min(1, (h - 0.5) * 2.6));
+        }
+        waterColor.setXYZ(i, waveTint.r, waveTint.g, waveTint.b);
       }
       waterPos.needsUpdate = true;
+      waterColor.needsUpdate = true;
       waterGeo.computeVertexNormals();
 
       // Drift clouds across the sky, wrapping around.
