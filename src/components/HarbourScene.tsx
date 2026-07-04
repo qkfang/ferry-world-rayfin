@@ -154,11 +154,21 @@ function createSailboat(): THREE.Group {
   const group = new THREE.Group();
   const hull = box(1.4, 0.4, 0.6, '#e8e2d5');
   hull.position.y = 0.2;
+  // Blue trim stripe and a small open cockpit.
+  const trim = box(1.42, 0.12, 0.62, '#3a6ea5', { flat: true });
+  trim.position.y = 0.34;
+  const cockpit = box(0.5, 0.16, 0.36, '#6b4a2b', { flat: true });
+  cockpit.position.set(-0.2, 0.46, 0);
   const mast = box(0.12, 1.6, 0.12, '#8a6a3a');
   mast.position.y = 1;
+  const boom = box(0.9, 0.08, 0.08, '#8a6a3a', { flat: true });
+  boom.position.set(-0.25, 0.6, 0);
   const sail = box(0.1, 1.1, 0.9, '#f4f1e8');
   sail.position.set(0.05, 1.05, 0.15);
-  group.add(hull, mast, sail);
+  // A smaller front jib sail.
+  const jib = box(0.08, 0.8, 0.5, '#ece4d4');
+  jib.position.set(0.5, 0.95, 0);
+  group.add(hull, trim, cockpit, mast, boom, sail, jib);
   return group;
 }
 
@@ -225,6 +235,18 @@ function createSkyscraper(
     antenna.position.y = base + 0.4 + height * 0.1;
     group.add(antenna);
   }
+  // Ground-floor lobby: a slightly wider, brighter podium with an entrance.
+  const podium = box(footprint * 1.12, 0.8, footprint * 1.12, '#c8cdd2', {
+    flat: true,
+  });
+  podium.position.y = 0.4;
+  group.add(podium);
+  const entrance = box(footprint * 0.4, 0.5, footprint * 1.16, '#2b3d47', {
+    flat: true,
+    opacity: 0.9,
+  });
+  entrance.position.y = 0.28;
+  group.add(entrance);
   return group;
 }
 
@@ -264,6 +286,15 @@ function createHouse(rand: () => number): THREE.Group {
   roof.position.y = wallH + 0.2;
   roof.rotation.z = 0.16;
   group.add(walls, roof);
+  // Front door and a pair of windows so houses read as lived-in.
+  const door = box(0.22, wallH * 0.55, 0.06, '#6b4a2b', { flat: true });
+  door.position.set(0, (wallH * 0.55) / 2, d / 2 + 0.02);
+  group.add(door);
+  [-w * 0.28, w * 0.28].forEach((wx) => {
+    const win = box(0.26, 0.26, 0.06, '#9fc4d6', { flat: true, opacity: 0.9 });
+    win.position.set(wx, wallH * 0.62, d / 2 + 0.02);
+    group.add(win);
+  });
   // Occasional chimney or a small garden tree beside the house.
   if (rand() > 0.6) {
     const chimney = box(0.24, 0.6, 0.24, '#8a6a54', { flat: true });
@@ -309,6 +340,13 @@ function createMidRise(rand: () => number): THREE.Group {
   const parapet = box(w * 1.04, 0.2, d * 1.04, '#8f8778', { flat: true });
   parapet.position.y = h + 0.1;
   group.add(parapet);
+  // Ground-floor shopfront/awning band gives street-level activity.
+  const shopfront = box(w * 1.04, 0.5, d * 1.04, '#3a4a52', { flat: true, opacity: 0.9 });
+  shopfront.position.y = 0.28;
+  group.add(shopfront);
+  const awning = box(w * 1.16, 0.1, d * 1.16, '#b25a43', { flat: true });
+  awning.position.y = 0.6;
+  group.add(awning);
   if (rand() > 0.5) {
     const tank = box(w * 0.35, 0.5, d * 0.35, '#6f6a5f', { flat: true });
     tank.position.set((rand() - 0.5) * w * 0.4, h + 0.35, (rand() - 0.5) * d * 0.4);
@@ -547,8 +585,8 @@ function createLandmark(site: TourismSite): THREE.Group {
       }
     });
   } else if (name.includes('bridge')) {
-    // Sydney Harbour Bridge: two stone pylon pairs, a smooth stepped steel
-    // arch, hangers, and a road deck spanning the water.
+    // Sydney Harbour Bridge: two stone pylon pairs, a twin-chord steel arch
+    // with lattice cross-bracing, hangers, and a railed road deck.
     const pylons: [number, number][] = [
       [-3, -0.7],
       [-3, 0.7],
@@ -559,26 +597,52 @@ function createLandmark(site: TourismSite): THREE.Group {
       const pylon = box(0.7, 3.6, 0.7, '#cfc8bb');
       pylon.position.set(x, 2, z);
       group.add(pylon);
+      // Stone pylon cap + flagpole for landmark detail.
+      const cap = box(0.85, 0.3, 0.85, '#b7ad9c', { flat: true });
+      cap.position.set(x, 3.9, z);
+      group.add(cap);
     });
-    const steps = 13;
+    const steps = 17;
+    const chordZ = [-0.55, 0.55];
     for (let i = 0; i < steps; i++) {
       const t = i / (steps - 1);
       const x = (t - 0.5) * 6;
       const y = 2.4 + Math.sin(t * Math.PI) * 2.4;
-      const seg = box(0.6, 0.4, 0.5, color);
-      seg.position.set(x, y, 0);
-      group.add(seg);
-      // Vertical hangers from arch down to the deck.
+      // Two parallel arch chords (front and back).
+      chordZ.forEach((z) => {
+        const seg = box(0.55, 0.36, 0.28, color);
+        seg.position.set(x, y, z);
+        group.add(seg);
+      });
+      // Diagonal lattice cross-bracing between the chords.
+      if (i % 2 === 0) {
+        const brace = box(0.12, 0.12, 1.2, '#7f8a84', { flat: true });
+        brace.position.set(x, y, 0);
+        brace.rotation.x = i % 4 === 0 ? 0.5 : -0.5;
+        group.add(brace);
+      }
+      // Vertical hangers from each arch chord down to the deck.
       if (i % 2 === 0) {
         const drop = y - 2.3;
-        const hanger = box(0.08, drop, 0.08, '#8f8a80');
-        hanger.position.set(x, 2.3 + drop / 2, 0);
-        group.add(hanger);
+        chordZ.forEach((z) => {
+          const hanger = box(0.08, drop, 0.08, '#8f8a80');
+          hanger.position.set(x, 2.3 + drop / 2, z);
+          group.add(hanger);
+        });
       }
     }
-    const deck = box(6.4, 0.3, 1, '#5c5c5c');
+    const deck = box(6.4, 0.3, 1.4, '#5c5c5c');
     deck.position.set(0, 2.3, 0);
     group.add(deck);
+    // Deck railings down each side and a centre lane line.
+    [-0.62, 0.62].forEach((z) => {
+      const rail = box(6.4, 0.16, 0.06, '#b7ad9c', { flat: true });
+      rail.position.set(0, 2.55, z);
+      group.add(rail);
+    });
+    const laneLine = box(6.4, 0.02, 0.08, '#d8cf5a', { flat: true });
+    laneLine.position.set(0, 2.46, 0);
+    group.add(laneLine);
   } else if (name.includes('luna')) {
     // Amusement-park face arch + a little tower.
     const arch = box(3, 0.6, 0.6, color);
@@ -646,17 +710,56 @@ function createFerry(hullColor: THREE.ColorRepresentation): THREE.Group {
   const group = new THREE.Group();
   const hull = box(3.4, 0.9, 1.6, hullColor);
   hull.position.y = 0.45;
+  // Green waterline stripe below the white superstructure band.
+  const waterline = box(3.44, 0.18, 1.64, '#123f2a', { flat: true });
+  waterline.position.y = 0.12;
   const hullTop = box(3.4, 0.5, 1.6, '#f2f0e6');
   hullTop.position.y = 1.1;
+  // Row of passenger windows along the lower saloon.
+  const lowerWindows = box(2.9, 0.22, 1.64, '#38566b', { flat: true, opacity: 0.9 });
+  lowerWindows.position.y = 1.12;
   const cabin = box(2, 0.9, 1.2, '#ffffff');
   cabin.position.set(-0.2, 1.75, 0);
+  // Upper-deck windows wrapping the cabin.
+  const cabinWindows = box(2.02, 0.34, 1.22, '#38566b', { flat: true, opacity: 0.9 });
+  cabinWindows.position.set(-0.2, 1.75, 0);
   const roof = box(2.1, 0.2, 1.3, hullColor);
   roof.position.set(-0.2, 2.3, 0);
   const funnel = box(0.5, 0.9, 0.5, '#d9b641');
   funnel.position.set(-1, 2.6, 0);
+  const funnelCap = box(0.6, 0.16, 0.6, '#3a3a3a', { flat: true });
+  funnelCap.position.set(-1, 3.05, 0);
   const bow = box(0.8, 0.9, 1.2, hullColor);
   bow.position.set(1.9, 0.5, 0);
-  group.add(hull, hullTop, cabin, roof, funnel, bow);
+  // Open bow deck with side railings so it reads as a real vessel.
+  const deck = box(1.1, 0.1, 1.3, '#c9a978', { flat: true });
+  deck.position.set(1.4, 0.95, 0);
+  const railL = box(1.2, 0.24, 0.06, '#e8e2d5', { flat: true });
+  railL.position.set(1.4, 1.1, 0.62);
+  const railR = box(1.2, 0.24, 0.06, '#e8e2d5', { flat: true });
+  railR.position.set(1.4, 1.1, -0.62);
+  // Wheelhouse mast with a small navigation light.
+  const mast = box(0.1, 0.7, 0.1, '#8f8a80', { flat: true });
+  mast.position.set(0.5, 2.75, 0);
+  const navLight = box(0.16, 0.16, 0.16, '#e2503b', { flat: true });
+  navLight.position.set(0.5, 3.15, 0);
+  group.add(
+    hull,
+    waterline,
+    hullTop,
+    lowerWindows,
+    cabin,
+    cabinWindows,
+    roof,
+    funnel,
+    funnelCap,
+    bow,
+    deck,
+    railL,
+    railR,
+    mast,
+    navLight
+  );
   return group;
 }
 
@@ -726,21 +829,44 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
     const size = boundsBox.getSize(new THREE.Vector3());
     const span = Math.max(size.x, size.z) + 16;
 
-    // Animated low-poly water surface.
+    // Animated low-poly water surface with per-vertex colouring so wave crests
+    // pick up sunlit teal and foam highlights for a more realistic harbour.
     const waterSize = span * 1.8;
-    const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, 32, 32);
+    const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, 64, 64);
     waterGeo.rotateX(-Math.PI / 2);
+    const waterVertexCount = waterGeo.attributes.position.count;
+    waterGeo.setAttribute(
+      'color',
+      new THREE.BufferAttribute(new Float32Array(waterVertexCount * 3), 3)
+    );
     const waterMat = new THREE.MeshStandardMaterial({
-      color: '#2f7cad',
-      roughness: 0.85,
-      metalness: 0.1,
+      vertexColors: true,
+      roughness: 0.6,
+      metalness: 0.25,
       flatShading: true,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.95,
     });
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.position.set(center.x, WATER_LEVEL - 0.15, center.z);
     scene.add(water);
+    // Palette used to tint the water between deep troughs, mid teal and foam.
+    const waterDeep = new THREE.Color('#1c5f8f');
+    const waterMid = new THREE.Color('#2f7cad');
+    const waterFoam = new THREE.Color('#bfe6f0');
+
+    // A darker, still seabed plane below the surface adds depth through the
+    // semi-transparent water rather than showing empty background.
+    const seabedGeo = new THREE.PlaneGeometry(waterSize, waterSize);
+    seabedGeo.rotateX(-Math.PI / 2);
+    const seabedMat = new THREE.MeshStandardMaterial({
+      color: '#124158',
+      roughness: 1,
+      flatShading: true,
+    });
+    const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+    seabed.position.set(center.x, WATER_LEVEL - 1.2, center.z);
+    scene.add(seabed);
 
     // Voxel landscape: the harbour's surrounding shores, hills, and islands.
     scene.add(createLandscape(sites));
@@ -913,22 +1039,39 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
     const clock = new THREE.Clock();
     let frameId = 0;
     const waterPos = waterGeo.attributes.position;
+    const waterColor = waterGeo.attributes.color as THREE.BufferAttribute;
+    const waveTint = new THREE.Color();
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.05);
       const elapsed = clock.elapsedTime;
 
-      // Ripple the water surface.
+      // Ripple the water surface with layered swell + chop, and tint each
+      // vertex from deep trough to foamy crest for a livelier harbour.
       for (let i = 0; i < waterPos.count; i++) {
         const x = waterPos.getX(i);
         const z = waterPos.getZ(i);
-        const y =
-          Math.sin(x * 0.15 + elapsed * 1.1) * 0.28 +
-          Math.cos(z * 0.19 + elapsed * 0.9) * 0.22;
+        const swell =
+          Math.sin(x * 0.12 + elapsed * 0.9) * 0.3 +
+          Math.cos(z * 0.16 + elapsed * 0.75) * 0.24;
+        const chop =
+          Math.sin(x * 0.42 + z * 0.31 + elapsed * 1.8) * 0.09 +
+          Math.cos(x * 0.27 - z * 0.35 + elapsed * 2.3) * 0.07;
+        const y = swell + chop;
         waterPos.setY(i, y);
+
+        // Map wave height to a colour: troughs deep, crests foamy.
+        const h = (y + 0.5) / 1.0; // roughly 0..1
+        if (h < 0.5) {
+          waveTint.copy(waterDeep).lerp(waterMid, Math.max(0, h * 2));
+        } else {
+          waveTint.copy(waterMid).lerp(waterFoam, Math.min(1, (h - 0.5) * 2.6));
+        }
+        waterColor.setXYZ(i, waveTint.r, waveTint.g, waveTint.b);
       }
       waterPos.needsUpdate = true;
+      waterColor.needsUpdate = true;
       waterGeo.computeVertexNormals();
 
       // Drift clouds across the sky, wrapping around.
