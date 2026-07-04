@@ -55,6 +55,83 @@ function tree(): THREE.Group {
   return group;
 }
 
+/** Deterministic tiny PRNG so scattered scenery stays stable across renders. */
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A radial model of Sydney Harbour's shape, derived from the tourism-site
+ * layout: a central body of water ringed by land, opening to the Pacific at the
+ * eastern Heads (between South Head / Watsons Bay and North Head / Manly).
+ *
+ * Returns an `isWater(sx, sz)` predicate in site-grid coordinates. Every
+ * waterfront site therefore sits on the coast, the ferries travel the central
+ * basin, and islands (e.g. Fort Denison) stay as land in open water.
+ */
+function buildHarbourModel(sites: TourismSite[]): {
+  isWater: (sx: number, sz: number) => boolean;
+  cx: number;
+  cz: number;
+} {
+  const cx = sites.reduce((sum, s) => sum + s.posX, 0) / sites.length;
+  const cz = sites.reduce((sum, s) => sum + s.posZ, 0) / sites.length;
+
+  // Each site's polar position relative to the harbour centre, ordered by angle
+  // so we can interpolate a continuous shoreline radius between them.
+  const ring = sites
+    .map((s) => ({
+      ang: Math.atan2(s.posZ - cz, s.posX - cx),
+      r: Math.hypot(s.posX - cx, s.posZ - cz),
+    }))
+    .sort((a, b) => a.ang - b.ang);
+
+  const shoreRadius = (ang: number): number => {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      let a1 = b.ang;
+      let t = ang;
+      if (i === ring.length - 1) {
+        a1 += Math.PI * 2;
+        if (t < a.ang) t += Math.PI * 2;
+      }
+      if (t >= a.ang && t <= a1) {
+        const f = (t - a.ang) / ((a1 - a.ang) || 1);
+        return a.r + (b.r - a.r) * f;
+      }
+    }
+    return ring[0].r;
+  };
+
+  // Eastern ocean opening between the two Heads (radians measured from centre).
+  const OCEAN_MIN = -0.62;
+  const OCEAN_MAX = 0.14;
+  // Push the coast just outside the waterfront sites so they front the water.
+  const SHORE_MARGIN = 2.2;
+
+  const islands = sites
+    .filter((s) => s.category === 'island')
+    .map((s) => ({ x: s.posX, z: s.posZ }));
+
+  const isWater = (sx: number, sz: number): boolean => {
+    for (const isle of islands) {
+      if (Math.hypot(sx - isle.x, sz - isle.z) < 1.6) return false;
+    }
+    const ang = Math.atan2(sz - cz, sx - cx);
+    if (ang > OCEAN_MIN && ang < OCEAN_MAX) return true;
+    return Math.hypot(sx - cx, sz - cz) < shoreRadius(ang) + SHORE_MARGIN;
+  };
+
+  return { isWater, cx, cz };
+}
+
 /** A fluffy voxel cloud built from a cluster of white boxes. */
 function createCloud(): THREE.Group {
   const group = new THREE.Group();
@@ -95,6 +172,122 @@ function createSeagull(): THREE.Group {
   right.position.x = 0.35;
   right.rotation.z = -0.4;
   group.add(left, right);
+  return group;
+}
+
+/**
+ * Build the voxel landscape around the harbour: shoreline sand, rolling
+ * bushland, scattered trees, offshore islands and a little CBD skyline. Land
+ * tiles and trees are drawn as instanced meshes so the whole coast is cheap.
+ */
+function createLandscape(sites: TourismSite[]): THREE.Group {
+  const group = new THREE.Group();
+  const { isWater } = buildHarbourModel(sites);
+  const rand = mulberry32(0x5eed);
+  const top = WATER_LEVEL + 0.35; // land surface sits just above the waterline
+
+  const pad = 14;
+  const xs = sites.map((s) => s.posX);
+  const zs = sites.map((s) => s.posZ);
+  const minX = Math.floor(Math.min(...xs) - pad);
+  const maxX = Math.ceil(Math.max(...xs) + pad);
+  const minZ = Math.floor(Math.min(...zs) - pad);
+  const maxZ = Math.ceil(Math.max(...zs) + pad);
+
+  interface LandCell {
+    x: number;
+    z: number;
+    shore: boolean;
+    height: number;
+    color: THREE.Color;
+  }
+  const greens = ['#4f8f4a', '#5c9a4f', '#417a3c', '#68a85a'];
+  const cells: LandCell[] = [];
+  for (let sx = minX; sx <= maxX; sx++) {
+    for (let sz = minZ; sz <= maxZ; sz++) {
+      if (isWater(sx, sz)) continue;
+      const shore =
+        isWater(sx + 1, sz) ||
+        isWater(sx - 1, sz) ||
+        isWater(sx, sz + 1) ||
+        isWater(sx, sz - 1);
+      const hills = Math.sin(sx * 0.5) * Math.cos(sz * 0.4);
+      const height = shore ? 0.7 : 1 + Math.max(0, hills) * 1.6;
+      const color = new THREE.Color(
+        shore ? '#e6d8b0' : greens[Math.floor(rand() * greens.length)]
+      );
+      cells.push({ x: sx, z: sz, shore, height, color });
+    }
+  }
+
+  // Land tiles as a single instanced mesh (one draw call for the whole coast).
+  const tileGeo = new THREE.BoxGeometry(SCALE * 1.02, 1, SCALE * 1.02);
+  const tileMat = new THREE.MeshStandardMaterial({
+    roughness: 1,
+    metalness: 0,
+    flatShading: true,
+  });
+  const tiles = new THREE.InstancedMesh(tileGeo, tileMat, cells.length);
+  const matrix = new THREE.Matrix4();
+  cells.forEach((cell, i) => {
+    matrix.makeScale(1, cell.height, 1);
+    matrix.setPosition(cell.x * SCALE, top - cell.height / 2, cell.z * SCALE);
+    tiles.setMatrixAt(i, matrix);
+    tiles.setColorAt(i, cell.color);
+  });
+  tiles.instanceMatrix.needsUpdate = true;
+  if (tiles.instanceColor) tiles.instanceColor.needsUpdate = true;
+  group.add(tiles);
+
+  // Scatter voxel trees over the inland (non-shore) bushland, instanced.
+  const inland = cells.filter((c) => !c.shore);
+  const treeSpots = inland.filter(() => rand() < 0.08).slice(0, 160);
+  if (treeSpots.length > 0) {
+    const trunkGeo = new THREE.BoxGeometry(0.4, 1, 0.4);
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: '#6b4a2b',
+      flatShading: true,
+      roughness: 1,
+    });
+    const canopyGeo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+    const canopyMat = new THREE.MeshStandardMaterial({
+      color: '#3f7a3a',
+      flatShading: true,
+      roughness: 1,
+    });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeSpots.length);
+    const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, treeSpots.length);
+    treeSpots.forEach((cell, i) => {
+      const jx = cell.x * SCALE + (rand() - 0.5);
+      const jz = cell.z * SCALE + (rand() - 0.5);
+      const scale = 0.7 + rand() * 0.5;
+      matrix.makeScale(scale, scale, scale);
+      matrix.setPosition(jx, top + 0.5 * scale, jz);
+      trunks.setMatrixAt(i, matrix);
+      matrix.setPosition(jx, top + 1.6 * scale, jz);
+      canopies.setMatrixAt(i, matrix);
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    canopies.instanceMatrix.needsUpdate = true;
+    group.add(trunks, canopies);
+  }
+
+  // A small CBD skyline on the southern city shore behind Circular Quay.
+  const cbd = inland.filter((c) => c.z >= 7 && c.x >= -16 && c.x <= 4);
+  for (const cell of cbd) {
+    if (rand() > 0.35) continue;
+    const h = 3 + rand() * 6;
+    const tower = box(
+      SCALE * 0.7,
+      h,
+      SCALE * 0.7,
+      rand() > 0.5 ? '#b9c2cc' : '#8fa0ad',
+      { flat: true }
+    );
+    tower.position.set(cell.x * SCALE, top + h / 2, cell.z * SCALE);
+    group.add(tower);
+  }
+
   return group;
 }
 
@@ -335,6 +528,9 @@ export function HarbourScene({ sites, ferries, onArrive }: HarbourSceneProps) {
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.position.set(center.x, WATER_LEVEL - 0.15, center.z);
     scene.add(water);
+
+    // Voxel landscape: the harbour's surrounding shores, hills, and islands.
+    scene.add(createLandscape(sites));
 
     // Landmarks.
     route.forEach((r) => {
