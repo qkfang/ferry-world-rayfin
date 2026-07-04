@@ -264,6 +264,56 @@ function createHouse(rand: () => number): THREE.Group {
   roof.position.y = wallH + 0.2;
   roof.rotation.z = 0.16;
   group.add(walls, roof);
+  // Occasional chimney or a small garden tree beside the house.
+  if (rand() > 0.6) {
+    const chimney = box(0.24, 0.6, 0.24, '#8a6a54', { flat: true });
+    chimney.position.set(w * 0.3, wallH + 0.5, 0);
+    group.add(chimney);
+  } else if (rand() > 0.5) {
+    const shrub = box(0.5, 0.5, 0.5, '#3f7a3a', { flat: true });
+    shrub.position.set(w * 0.7, 0.25, d * 0.6);
+    group.add(shrub);
+  }
+  return group;
+}
+
+/**
+ * A mid-rise apartment / office block: a flat-roofed building with banded
+ * window floors and a small rooftop parapet. Fills the inner-city ring between
+ * the tall CBD towers and the low suburban houses so the map reads as a full
+ * gradient of density.
+ */
+function createMidRise(rand: () => number): THREE.Group {
+  const group = new THREE.Group();
+  const facades = ['#c7bfae', '#b7c2c7', '#cabca6', '#a9b3b0', '#d0c6b4'];
+  const facade = facades[Math.floor(rand() * facades.length)];
+  const w = SCALE * (0.55 + rand() * 0.3);
+  const d = SCALE * (0.55 + rand() * 0.3);
+  const h = 1.6 + rand() * 3;
+  const body = box(w, h, d, facade, { flat: true });
+  body.position.y = h / 2;
+  group.add(body);
+
+  // Stacked window bands up the facade.
+  const floors = Math.max(1, Math.floor(h / 0.8));
+  for (let f = 0; f < floors; f++) {
+    const band = box(w * 1.02, 0.16, d * 1.02, '#41525c', {
+      flat: true,
+      opacity: 0.85,
+    });
+    band.position.y = (h / (floors + 1)) * (f + 1);
+    group.add(band);
+  }
+
+  // Flat roof parapet plus an occasional rooftop water tank / stair box.
+  const parapet = box(w * 1.04, 0.2, d * 1.04, '#8f8778', { flat: true });
+  parapet.position.y = h + 0.1;
+  group.add(parapet);
+  if (rand() > 0.5) {
+    const tank = box(w * 0.35, 0.5, d * 0.35, '#6f6a5f', { flat: true });
+    tank.position.set((rand() - 0.5) * w * 0.4, h + 0.35, (rand() - 0.5) * d * 0.4);
+    group.add(tank);
+  }
   return group;
 }
 
@@ -367,10 +417,11 @@ function createLandscape(sites: TourismSite[]): THREE.Group {
   // A denser, more detailed CBD skyline on the southern city shore behind
   // Circular Quay: setback glass towers of varied height, crowned by the
   // landmark Sydney Tower rising above the cluster.
-  const cbd = inland.filter((c) => c.z >= 7 && c.x >= -16 && c.x <= 4);
+  const isCbd = (c: LandCell) => c.z >= 7 && c.x >= -16 && c.x <= 4;
+  const cbd = inland.filter(isCbd);
   let tallest: LandCell | null = null;
   for (const cell of cbd) {
-    if (rand() > 0.55) continue;
+    if (rand() > 0.72) continue; // denser CBD than before
     const h = 3 + rand() * 8;
     const footprint = SCALE * (0.55 + rand() * 0.35);
     const tower = createSkyscraper(h, footprint, rand);
@@ -386,12 +437,60 @@ function createLandscape(sites: TourismSite[]): THREE.Group {
     group.add(sydneyTower);
   }
 
-  // Scatter low suburban houses over the remaining inland shore so the
-  // surrounding suburbs read as a lived-in city, not empty bushland.
-  const suburb = inland.filter(
-    (c) => !(c.z >= 7 && c.x >= -16 && c.x <= 4) && rand() < 0.06
+  // A street grid over the flatter inland cells: thin dark asphalt strips laid
+  // along every few grid lines so the whole map reads as a laid-out city, not
+  // loose scenery. Drawn as one instanced mesh (a single draw call).
+  const roadCells = inland.filter(
+    (c) => c.height < 1.6 && (((c.x % 3) + 3) % 3 === 0 || ((c.z % 3) + 3) % 3 === 0)
   );
-  for (const cell of suburb.slice(0, 120)) {
+  if (roadCells.length > 0) {
+    const roadGeo = new THREE.BoxGeometry(SCALE * 1.02, 0.08, SCALE * 1.02);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: '#4a4d52',
+      roughness: 1,
+      metalness: 0,
+      flatShading: true,
+    });
+    const roads = new THREE.InstancedMesh(roadGeo, roadMat, roadCells.length);
+    roadCells.forEach((cell, i) => {
+      matrix.makeScale(1, 1, 1);
+      matrix.setPosition(cell.x * SCALE, top + 0.05, cell.z * SCALE);
+      roads.setMatrixAt(i, matrix);
+    });
+    roads.instanceMatrix.needsUpdate = true;
+    group.add(roads);
+  }
+
+  // Inner-city ring: mid-rise apartment / office blocks in the belt just
+  // outside the CBD (and along the harbour foreshore), giving a density
+  // gradient from towers down to houses.
+  const midRise = inland.filter(
+    (c) =>
+      !isCbd(c) &&
+      c.x >= -22 &&
+      c.x <= 10 &&
+      c.z >= 1 &&
+      c.z <= 14 &&
+      rand() < 0.14
+  );
+  for (const cell of midRise.slice(0, 90)) {
+    const block = createMidRise(rand);
+    block.position.set(
+      cell.x * SCALE + (rand() - 0.5) * 0.4,
+      top,
+      cell.z * SCALE + (rand() - 0.5) * 0.4
+    );
+    block.rotation.y = (Math.floor(rand() * 4) * Math.PI) / 2;
+    group.add(block);
+  }
+
+  // Scatter low suburban houses over the remaining inland shore so the
+  // surrounding suburbs read as a lived-in city that fills the whole map,
+  // not empty bushland.
+  const suburb = inland.filter(
+    (c) => !isCbd(c) && !(c.x >= -22 && c.x <= 10 && c.z >= 1 && c.z <= 14) && rand() < 0.16
+  );
+  for (const cell of suburb.slice(0, 360)) {
     const house = createHouse(rand);
     house.position.set(
       cell.x * SCALE + (rand() - 0.5),
