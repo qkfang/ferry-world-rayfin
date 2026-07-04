@@ -176,6 +176,98 @@ function createSeagull(): THREE.Group {
 }
 
 /**
+ * A detailed voxel skyscraper: a tapering, setback tower with tinted glass
+ * facades, banded window floors and a little rooftop plant/antenna, so the CBD
+ * reads as a dense 3D city rather than plain blocks.
+ */
+function createSkyscraper(
+  height: number,
+  footprint: number,
+  rand: () => number
+): THREE.Group {
+  const group = new THREE.Group();
+  const glassTints = ['#5f7d92', '#6d8ea3', '#7fa2b5', '#8aa7ad', '#9fb4bf'];
+  const tint = glassTints[Math.floor(rand() * glassTints.length)];
+
+  // Stack a few setback sections, each narrower than the one below it.
+  const sections = 1 + Math.floor(rand() * 3);
+  let base = 0;
+  let w = footprint;
+  let d = footprint;
+  for (let s = 0; s < sections; s++) {
+    const segH = height * (0.28 + rand() * 0.2);
+    const body = box(w, segH, d, tint, { flat: true });
+    body.position.y = base + segH / 2;
+    group.add(body);
+
+    // Window bands: thin darker slabs stacked up the facade catch the light.
+    const floors = Math.max(1, Math.floor(segH / 0.9));
+    for (let f = 0; f < floors; f++) {
+      const band = box(w * 1.01, 0.18, d * 1.01, '#2f4653', {
+        flat: true,
+        opacity: 0.85,
+      });
+      band.position.y = base + (segH / (floors + 1)) * (f + 1);
+      group.add(band);
+    }
+
+    base += segH;
+    w *= 0.72 + rand() * 0.12;
+    d *= 0.72 + rand() * 0.12;
+  }
+
+  // Rooftop detail: a plant room plus a thin antenna mast.
+  const cap = box(w * 0.6, 0.4, d * 0.6, '#54606b', { flat: true });
+  cap.position.y = base + 0.2;
+  group.add(cap);
+  if (rand() > 0.4) {
+    const antenna = box(0.12, height * 0.2, 0.12, '#c94f3d', { flat: true });
+    antenna.position.y = base + 0.4 + height * 0.1;
+    group.add(antenna);
+  }
+  return group;
+}
+
+/**
+ * Sydney Tower: the CBD's tallest landmark. A slim shaft rising to a golden
+ * observation turret crowned with a spire.
+ */
+function createSydneyTower(): THREE.Group {
+  const group = new THREE.Group();
+  const shaft = box(0.7, 11, 0.7, '#d8d2c4', { flat: true });
+  shaft.position.y = 5.5;
+  const turret = box(1.8, 1.6, 1.8, '#e0b23c', { flat: true });
+  turret.position.y = 11.4;
+  const turretTop = box(1.3, 0.7, 1.3, '#caa032', { flat: true });
+  turretTop.position.y = 12.5;
+  const spire = box(0.16, 3.4, 0.16, '#b9b3a5', { flat: true });
+  spire.position.y = 14.6;
+  group.add(shaft, turret, turretTop, spire);
+  return group;
+}
+
+/** A small suburban voxel house with walls and a pitched roof. */
+function createHouse(rand: () => number): THREE.Group {
+  const group = new THREE.Group();
+  const wallColors = ['#e6ddcf', '#dccdb4', '#cfd6da', '#e2cbb2', '#d3c3a6'];
+  const roofColors = ['#a8462f', '#8a5a3b', '#6d7a82', '#94533a'];
+  const wallH = 0.8 + rand() * 0.5;
+  const w = 1 + rand() * 0.5;
+  const d = 1 + rand() * 0.5;
+  const walls = box(w, wallH, d, wallColors[Math.floor(rand() * wallColors.length)], {
+    flat: true,
+  });
+  walls.position.y = wallH / 2;
+  const roof = box(w * 1.12, 0.4, d * 1.12, roofColors[Math.floor(rand() * roofColors.length)], {
+    flat: true,
+  });
+  roof.position.y = wallH + 0.2;
+  roof.rotation.z = 0.16;
+  group.add(walls, roof);
+  return group;
+}
+
+/**
  * Build the voxel landscape around the harbour: shoreline sand, rolling
  * bushland, scattered trees, offshore islands and a little CBD skyline. Land
  * tiles and trees are drawn as instanced meshes so the whole coast is cheap.
@@ -272,20 +364,42 @@ function createLandscape(sites: TourismSite[]): THREE.Group {
     group.add(trunks, canopies);
   }
 
-  // A small CBD skyline on the southern city shore behind Circular Quay.
+  // A denser, more detailed CBD skyline on the southern city shore behind
+  // Circular Quay: setback glass towers of varied height, crowned by the
+  // landmark Sydney Tower rising above the cluster.
   const cbd = inland.filter((c) => c.z >= 7 && c.x >= -16 && c.x <= 4);
+  let tallest: LandCell | null = null;
   for (const cell of cbd) {
-    if (rand() > 0.35) continue;
-    const h = 3 + rand() * 6;
-    const tower = box(
-      SCALE * 0.7,
-      h,
-      SCALE * 0.7,
-      rand() > 0.5 ? '#b9c2cc' : '#8fa0ad',
-      { flat: true }
-    );
-    tower.position.set(cell.x * SCALE, top + h / 2, cell.z * SCALE);
+    if (rand() > 0.55) continue;
+    const h = 3 + rand() * 8;
+    const footprint = SCALE * (0.55 + rand() * 0.35);
+    const tower = createSkyscraper(h, footprint, rand);
+    tower.position.set(cell.x * SCALE, top, cell.z * SCALE);
     group.add(tower);
+    if (!tallest || h > tallest.height) {
+      tallest = { ...cell, height: h };
+    }
+  }
+  if (tallest) {
+    const sydneyTower = createSydneyTower();
+    sydneyTower.position.set(tallest.x * SCALE, top, tallest.z * SCALE);
+    group.add(sydneyTower);
+  }
+
+  // Scatter low suburban houses over the remaining inland shore so the
+  // surrounding suburbs read as a lived-in city, not empty bushland.
+  const suburb = inland.filter(
+    (c) => !(c.z >= 7 && c.x >= -16 && c.x <= 4) && rand() < 0.06
+  );
+  for (const cell of suburb.slice(0, 120)) {
+    const house = createHouse(rand);
+    house.position.set(
+      cell.x * SCALE + (rand() - 0.5),
+      top,
+      cell.z * SCALE + (rand() - 0.5)
+    );
+    house.rotation.y = rand() * Math.PI;
+    group.add(house);
   }
 
   return group;
