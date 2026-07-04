@@ -1,110 +1,59 @@
-import {
-  BotIcon,
-  BookOpenIcon,
-  CodeIcon,
-  DatabaseIcon,
-  LogOutIcon,
-  ShieldIcon,
-  SparklesIcon,
-} from 'lucide-react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { AnchorIcon, LogOutIcon, ShipIcon } from 'lucide-react';
 
-import { TodoForm } from '@/components/TodoForm';
-import { TodoList } from '@/components/TodoList';
+import { SiteList } from '@/components/SiteList';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/AuthContext';
-import { useTodos } from '@/hooks/useTodos';
+import { useFerries } from '@/hooks/useFerries';
+import { useSites } from '@/hooks/useSites';
 
-const FEATURES = [
-  {
-    icon: DatabaseIcon,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600',
-    title: 'Built-in database, ready to go',
-    description: (
-      <>
-        Your database is up and running. The milestones above are synced from
-        it.
-      </>
-    ),
-  },
-  {
-    icon: BotIcon,
-    iconBg: 'bg-orange-100',
-    iconColor: 'text-orange-600',
-    title: 'Editable by an agent',
-    description:
-      'Your app is designed to be editable by an agent. When you are done reading this, go give it a try.',
-  },
-  {
-    icon: ShieldIcon,
-    iconBg: 'bg-pink-100',
-    iconColor: 'text-pink-600',
-    title: 'Public by default, add auth if needed',
-    description:
-      "To share your app (in Private Preview), invite users to your app's Fabric workspace.",
-  },
-  {
-    icon: SparklesIcon,
-    iconBg: 'bg-yellow-100',
-    iconColor: 'text-yellow-600',
-    title: 'Private Preview with more to come',
-    description:
-      'We have lots of features in the works, including Fabric data connections, storage, real-time services, and native agent support.',
-  },
-];
+import type { TourismSite } from '../../rayfin/data/TourismSite';
 
-const DOCS = [
-  {
-    icon: BookOpenIcon,
-    iconBg: 'bg-teal-100',
-    iconColor: 'text-teal-600',
-    title: 'Quick start guide',
-    description:
-      'Learn how to create a project, define your data models, and deploy your app in just a few steps.',
-    buttonLabel: 'View guide',
-    url: 'https://go.microsoft.com/fwlink/?linkid=2356937',
-  },
-  {
-    icon: CodeIcon,
-    iconBg: 'bg-teal-100',
-    iconColor: 'text-teal-600',
-    title: 'SDK reference',
-    description:
-      'Use our Typescript SDK to define your backend and connect your app.',
-    buttonLabel: 'View SDK docs',
-    url: 'https://go.microsoft.com/fwlink/?linkid=2356833',
-  },
-];
+// three.js is heavy; load the voxel scene as its own chunk.
+const HarbourScene = lazy(() =>
+  import('@/components/HarbourScene').then((m) => ({ default: m.HarbourScene }))
+);
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
-  const { todos, loading, error, addTodo, toggleTodo } = useTodos();
+  const { sites, loading, error, usingFallback } = useSites();
+  const { ferries, usingLiveData } = useFerries();
+  const [currentSiteId, setCurrentSiteId] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     await signOut();
   };
 
-  const handleToggle = async (id: string, isCompleted: boolean) => {
-    try {
-      await toggleTodo(id, isCompleted);
-    } catch {
-      // toggle failed silently
-    }
-  };
+  const handleArrive = useCallback((site: TourismSite) => {
+    setCurrentSiteId(site.id);
+  }, []);
 
-  const handleAdd = async (title: string) => {
-    await addTodo(title);
-  };
+  const currentSite = useMemo(
+    () => sites.find((s) => s.id === currentSiteId) ?? null,
+    [sites, currentSiteId]
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <span className="text-lg font-semibold">Getting Started</span>
+    <div className="flex min-h-screen flex-col bg-slate-900 text-white">
+      <header className="border-b border-white/10 bg-slate-950/60">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <ShipIcon className="h-5 w-5 text-amber-300" />
+            <span className="text-lg font-semibold">
+              Sydney Harbour Ferry World
+            </span>
+          </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <span className="hidden text-sm text-white/60 sm:inline">
+              {user?.email}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="text-white hover:bg-white/10 hover:text-white"
+            >
               <LogOutIcon className="mr-2 h-4 w-4" />
               Sign Out
             </Button>
@@ -112,91 +61,78 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold">
-            Welcome to your app{' '}
-            <span role="img" aria-label="party">
-              🎉
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-6 lg:flex-row">
+        {/* Voxel harbour scene */}
+        <section className="relative min-h-[360px] flex-1 overflow-hidden rounded-3xl border border-white/10 bg-slate-800 shadow-xl lg:min-h-0">
+          {loading ? (
+            <div className="flex h-full items-center justify-center text-white/60">
+              Charting the harbour...
+            </div>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-white/60">
+                  Launching the ferry...
+                </div>
+              }
+            >
+              <HarbourScene sites={sites} ferries={ferries} onArrive={handleArrive} />
+            </Suspense>
+          )}
+
+          <div className="pointer-events-none absolute left-4 top-4 rounded-2xl bg-slate-950/60 px-4 py-2 backdrop-blur">
+            <p className="text-xs uppercase tracking-wide text-white/60">
+              Now cruising past
+            </p>
+            <p className="text-lg font-bold text-amber-300">
+              {currentSite ? currentSite.name : 'Setting sail...'}
+            </p>
+          </div>
+
+          <div className="pointer-events-none absolute right-4 top-4 flex items-center gap-2 rounded-full bg-slate-950/60 px-3 py-1.5 backdrop-blur">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                usingLiveData
+                  ? 'animate-pulse bg-emerald-400'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-xs font-semibold text-white/80">
+              {usingLiveData
+                ? `${ferries.length} live ferries from Fabric`
+                : 'Simulated ferry feed'}
             </span>
-          </h1>
-        </div>
+          </div>
+        </section>
 
-        {/* Journey Card */}
-        <div className="mb-16">
-          <div className="bg-white rounded-3xl shadow-xl p-8">
-            <h2 className="text-3xl font-bold mb-6 text-center">
-              Your journey so far
-            </h2>
+        {/* HUD: route + site details */}
+        <aside className="w-full shrink-0 space-y-4 lg:w-80">
+          <div className="rounded-3xl border border-white/10 bg-slate-800/70 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <AnchorIcon className="h-4 w-4 text-amber-300" />
+              <h2 className="text-sm font-bold uppercase tracking-wide text-white/80">
+                Ferry route
+              </h2>
+            </div>
 
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertDescription>{error}</AlertDescription>
+            {error && usingFallback && (
+              <Alert className="mb-3 border-amber-400/40 bg-amber-400/10 text-amber-100">
+                <AlertDescription className="text-xs">
+                  Showing the built-in harbour route. Deploy with{' '}
+                  <code>rayfin up</code> to load sites from your database.
+                </AlertDescription>
               </Alert>
             )}
 
-            <TodoList todos={todos} loading={loading} onToggle={handleToggle} />
-
-            <div className="mt-6">
-              <TodoForm onAdd={handleAdd} />
-            </div>
+            <SiteList sites={sites} currentSiteId={currentSiteId} />
           </div>
-        </div>
 
-        {/* About your app */}
-        <div className="mb-16 -mx-8">
-          <h2 className="text-3xl font-bold text-center mb-8">
-            About your app
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-            {FEATURES.map((feature) => (
-              <div key={feature.title} className="flex gap-4">
-                <div
-                  className={`flex-shrink-0 w-12 h-12 ${feature.iconBg} rounded-2xl flex items-center justify-center`}
-                >
-                  <feature.icon className={`w-5 h-5 ${feature.iconColor}`} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-gray-900 font-bold">{feature.title}</h3>
-                  <p className="text-gray-600 text-sm mt-1">
-                    {feature.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Documentation */}
-        <div>
-          <h2 className="text-3xl font-bold text-center mb-8">Documentation</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {DOCS.map((doc) => (
-              <div
-                key={doc.title}
-                className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col"
-              >
-                <div
-                  className={`w-12 h-12 ${doc.iconBg} rounded-2xl flex items-center justify-center mb-4`}
-                >
-                  <doc.icon className={`w-5 h-5 ${doc.iconColor}`} />
-                </div>
-                <h3 className="text-gray-900 font-bold text-lg">{doc.title}</h3>
-                <p className="text-gray-600 text-sm mt-2 flex-1">
-                  {doc.description}
-                </p>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 w-full py-2.5 border border-gray-200 rounded-xl text-center text-gray-700 font-medium hover:bg-gray-50 transition-colors block"
-                >
-                  {doc.buttonLabel}
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
+          <p className="px-2 text-xs leading-relaxed text-white/50">
+            A voxel ferry loops Sydney Harbour, calling at {sites.length} tourism
+            sites. Route and landmarks are powered by your Rayfin{' '}
+            <code>TourismSite</code> data.
+          </p>
+        </aside>
       </main>
     </div>
   );
