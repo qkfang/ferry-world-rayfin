@@ -1,0 +1,49 @@
+name: 30 Deploy Rayfin App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "rayfin/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - ".github/workflows/30_deploy_rayfin.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rayfin login
+        run: npx rayfin login --service-principal
+        env:
+          RAYFIN_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          RAYFIN_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          RAYFIN_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Deploy Rayfin app to Fabric
+        run: npx rayfin up
+        env:
+          RAYFIN_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          RAYFIN_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          RAYFIN_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Check deployment health
+        run: npx rayfin up status

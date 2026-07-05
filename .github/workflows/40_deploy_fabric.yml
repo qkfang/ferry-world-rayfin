@@ -1,0 +1,37 @@
+name: 40 Deploy Fabric Resources
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fabric/**"
+      - ".github/workflows/40_deploy_fabric.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install fabric-cicd
+        run: pip install azure-identity fabric-cicd==1.1.0
+
+      - name: Deploy Fabric items
+        working-directory: fabric
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          FABRIC_WORKSPACE_ID: ${{ secrets.FABRIC_WORKSPACE_ID }}
+          FABRIC_ENVIRONMENT: dev
+        run: python deploy.py
