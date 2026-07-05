@@ -37,16 +37,18 @@ function gpsToScene(lat: number, lng: number): { posX: number; posZ: number } {
 /**
  * Compute a heading (degrees clockwise from north/+Z) from the scene-grid
  * displacement between two consecutive positions.
+ * Scene grid convention: +X = east, +Z = north.
+ * Returns undefined when there is no meaningful movement.
  */
 function headingFromMovement(
   fromX: number,
   fromZ: number,
   toX: number,
   toZ: number
-): number {
+): number | undefined {
   const dx = toX - fromX;
   const dz = toZ - fromZ;
-  if (dx === 0 && dz === 0) return 0;
+  if (dx === 0 && dz === 0) return undefined;
   return ((Math.atan2(dx, dz) * 180) / Math.PI + 360) % 360;
 }
 
@@ -91,20 +93,26 @@ function seedFerries(seed: SeedFerry[]): FerryVessel[] {
  * Eventhouse (SydneyFerries table). When lat/lng are present they take
  * precedence over the stored posX/posZ. Heading is inferred from the direction
  * of travel between the previous and current GPS position.
+ * Stale entries (vessels no longer in the feed) are pruned from prevPos.
  */
 function applyGpsPositions(
   vessels: FerryVessel[],
   prev: Map<string, { posX: number; posZ: number; heading: number }>
 ): FerryVessel[] {
+  const activeIds = new Set(vessels.map((v) => v.id));
+  for (const id of prev.keys()) {
+    if (!activeIds.has(id)) prev.delete(id);
+  }
+
   return vessels.map((v) => {
     if (v.lat == null || v.lng == null) return v;
 
     const { posX, posZ } = gpsToScene(v.lat, v.lng);
     const existing = prev.get(v.id);
-    const heading = existing
-      ? headingFromMovement(existing.posX, existing.posZ, posX, posZ) ||
-        existing.heading
-      : v.heading;
+    const computed = existing
+      ? headingFromMovement(existing.posX, existing.posZ, posX, posZ)
+      : undefined;
+    const heading = computed ?? existing?.heading ?? v.heading;
 
     prev.set(v.id, { posX, posZ, heading });
     return { ...v, posX, posZ, heading };
