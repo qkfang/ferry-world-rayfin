@@ -24,7 +24,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install fabric-cicd
-        run: pip install azure-identity fabric-cicd==1.1.0
+        run: pip install -r fabric/requirements.txt
 
       - name: Deploy Fabric items
         working-directory: fabric
