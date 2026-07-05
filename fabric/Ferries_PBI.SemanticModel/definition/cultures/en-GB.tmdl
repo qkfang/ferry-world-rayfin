@@ -1,0 +1,98 @@
+cultureInfo en-GB
+
+	linguisticMetadata =
+			{
+			  "Version": "2.0.0",
+			  "Language": "en-US",
+			  "Entities": {
+			    "orders_category.category": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "★Orders_Category",
+			          "ConceptualProperty": "★Category"
+			        }
+			      },
+			      "State": "Generated"
+			    },
+			    "mesures.total_sales_ytd": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "Mesures",
+			          "ConceptualProperty": "Total Sales YTD"
+			        }
+			      },
+			      "State": "Generated"
+			    },
+			    "mesures.total_sales_ytd_ly": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "Mesures",
+			          "ConceptualProperty": "Total Sales YTD LY"
+			        }
+			      },
+			      "State": "Generated"
+			    },
+			    "mesures.sales_ytd_var": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "Mesures",
+			          "ConceptualProperty": "Sales YTD Var"
+			        }
+			      },
+			      "State": "Generated"
+			    },
+			    "kusto_query_result.ferry_destination": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "Latest Ferry Positions",
+			          "ConceptualProperty": "ferry_destination"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Ferry Destination": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "contract_type.contract_type": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "★ Contract Type",
+			          "ConceptualProperty": "★ Contract Type"
+			        }
+			      },
+			      "State": "Generated"
+			    },
+			    "kusto_query_result.ferry_name": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "Latest Ferry Positions",
+			          "ConceptualProperty": "ferry_name"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Ferry Name": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    }
+			  }
+			}
+		contentType: json
+

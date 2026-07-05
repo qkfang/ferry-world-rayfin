@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "Ferries_PBI"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "30a7ee2e-17d8-a16f-4339-6c08dd8d4ab9"
+  }
+}
