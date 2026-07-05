@@ -12,6 +12,9 @@ const FERRY_FIELDS = [
   'heading',
   'color',
   'updatedAt',
+  'lat',
+  'lng',
+  'destination',
 ] as const;
 
 export class RayfinFerryService implements IFerryService {

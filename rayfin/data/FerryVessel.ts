@@ -7,6 +7,11 @@ import {
   uuid,
 } from '@microsoft/rayfin-core';
 
+// GPS reference calibration for the Sydney Harbour voxel scene.
+// Positions are derived from the Fabric Eventhouse SydneyFerries table
+// which provides real-time lat/lng from the Transport for NSW feed.
+// Frontend converts GPS → scene grid via gpsToScene() in useFerries.ts.
+
 /**
  * A live ferry vessel cruising Sydney Harbour.
  *
@@ -36,4 +41,19 @@ export class FerryVessel {
   @text({ max: 20 }) color!: string;
   /** Timestamp of the last position report. */
   @date() updatedAt!: Date;
+  /**
+   * GPS latitude from the Fabric Eventhouse SydneyFerries feed (ferry_lat).
+   * When set, the frontend derives posX/posZ via the GPS→scene transform.
+   */
+  @decimal() lat?: number;
+  /**
+   * GPS longitude from the Fabric Eventhouse SydneyFerries feed (ferry_long).
+   * When set, the frontend derives posX/posZ via the GPS→scene transform.
+   */
+  @decimal() lng?: number;
+  /**
+   * Ferry destination from the live feed (ferry_destination), e.g. "Manly".
+   * Displayed in the HUD alongside routeName.
+   */
+  @text({ max: 100 }) destination?: string;
 }
