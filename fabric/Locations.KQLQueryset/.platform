@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLQueryset",
+    "displayName": "Locations",
+    "description": "Locations"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "bf426d1d-bf94-936e-4c8e-acb721b33cb7"
+  }
+}

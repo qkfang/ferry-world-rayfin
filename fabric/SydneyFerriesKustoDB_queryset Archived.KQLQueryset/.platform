@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLQueryset",
+    "displayName": "SydneyFerriesKustoDB_queryset Archived",
+    "description": "SydneyFerriesKustoDB_queryset Archived"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "3203f750-b0cb-8c7e-4e90-eb8f02a294e3"
+  }
+}
