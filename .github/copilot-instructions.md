@@ -25,3 +25,7 @@ the service account (sp-demo-01) has access to deploy fabric resources, and the 
    • Open in Fabric portal: https://app.fabric.microsoft.com/groups/bd5002bf-994a-4f7a-926b-b90391e5c5b2/appbackends/bf06b958-19e0-464e-8bf3-23f26258af4d?ctid=9d2116ce-afe6-4ce8-8bc3-c7c7b69856c2
    • Build your frontend — use `rayfin env` to generate env variables for your framework (e.g. VITE_RAYFIN_API_URL) and reference them in your code to connect to the backend
    • Use the publishable key as X-Publishable-Key header in data-plane requests
+
+   rayfin documentations
+
+   https://learn.microsoft.com/en-us/fabric/apps/
