@@ -1,5 +1,5 @@
-id: ferry-world-rayfin
-name: ferry-world-rayfin
+id: test-app
+name: Test_App
 version: 1.0.0
 services:
   auth:
@@ -10,11 +10,7 @@ services:
       enabled: true
     allowedRedirectUris:
       - http://localhost:5173
-    customClaims:
-      app_version: 1.0.0
-    scopes:
-      - read:data
-      - write:data
+      - https://broad-inlet-39886f4465-australiaeast.webapp.fabricapps.net
   data:
     enabled: true
     dialect: mssql
@@ -23,3 +19,7 @@ services:
     folder: dist
     buildCommand: npm run build:fabric
     indexDocument: index.html
+  storage:
+    enabled: false
+  functions:
+    enabled: false

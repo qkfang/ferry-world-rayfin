@@ -1,240 +1,279 @@
-# Sydney Harbour Ferry World
+# Sydney Harbour — Live Ferries 3D
 
-A Rayfin app with a **voxel frontend** that simulates a ferry cruising Sydney
-Harbour past its famous tourism sites. Built with three.js, Tailwind CSS,
-shadcn UI components, and Fabric Entra authentication.
+A photorealistic 3D map of Sydney Harbour that renders **live ferry positions**
+from a Fabric Real-Time Intelligence **Eventhouse** (KQL). Built as a **Rayfin
+Fabric App** (`Test_App`) on the `Rayfin_Hack` workspace: React 19 + Vite +
+Cesium frontend, Fabric SSO for identity, and Fabric-hosted static content.
 
-The harbour route and voxel landmarks are powered by a Rayfin `TourismSite`
-data entity, and the ferries themselves are driven by a `FerryVessel` entity
-that holds live vessel positions. When the backend has live positions the
-voxel ferries mirror them; otherwise a single ferry loops the harbour, calling
-at each stop (Circular Quay, the Opera House, the Harbour Bridge, Taronga Zoo,
-Manly, and more) while the HUD highlights the site it is currently cruising
-past.
+- **Live tracking** — polls the latest position per ferry every 5 s and animates
+  each vessel gliding across the harbour. Heading is derived from movement
+  (the feed has no bearing/speed field).
+- **Photoreal 3D globe** — Cesium with Google Photorealistic 3D Tiles / Cesium
+  OSM Buildings when a Cesium Ion token is present; falls back to keyless
+  OpenStreetMap imagery + extruded OSM building footprints otherwise.
+- **Fleet & timetable side panel** — a live fleet list (click to fly the camera
+  to a ferry) plus today's TfNSW GTFS scheduled departures.
+- **Wharf markers** placed from the Eventhouse `ReferenceLocation` table.
 
-Inspired by the isometric voxel style of the
-[zava-claims-agent](https://github.com/qkfang/zava-claims-agent/tree/main/src/frontend)
-demo (which uses Babylon.js); this app renders the scene with three.js.
+---
 
-## Features
+## Architecture
 
-- **Dynamic voxel harbour scene**: An isometric three.js scene with animated
-  low-poly water, drifting clouds and a sun, circling seagulls, ambient
-  sailboats, and detailed voxel landmarks (bespoke Opera House sails and a
-  stepped Harbour Bridge arch with hangers)
-- **Live ferries from Fabric**: Ferries are positioned from the `FerryVessel`
-  entity, polled from the backend; the scene smoothly interpolates each vessel
-  to its reported position and orients it to its heading. Falls back to a
-  simulated feed (and a looping route ferry) when no backend is available
-- **Rayfin-backed data**: Tourism sites are stored in the `TourismSite` entity
-  and seeded on first load; the scene falls back to built-in sites if no
-  backend is available yet
-- **Live HUD**: A route list highlights the stop the lead ferry is nearest to,
-  plus a live/simulated feed indicator
-- **Radix UI Components**: Production-ready components styled with Tailwind CSS v4
-- **Production-First Workflow**: Deploy first, develop against Fabric backend
-- **Authentication**: Fabric Entra SSO in production; mock email/password for local dev
+### System overview
 
-## Getting Started
+```mermaid
+flowchart LR
+    subgraph Browser["Browser — React 19 + Vite SPA"]
+        UI["HomePage / SidePanel"]
+        Cesium["CesiumView<br/>(3D globe + ferries)"]
+        Svc["ferryService.ts"]
+        Auth["AuthContext<br/>(Rayfin)"]
+        Kusto["kustoClient.ts<br/>(MSAL)"]
+    end
 
-### Prerequisites
+    subgraph Fabric["Microsoft Fabric — Rayfin_Hack workspace"]
+        Static["Static Hosting<br/>(Fabric App, SSO)"]
+        EH[("Eventhouse<br/>SydneyFerriesKustoDB")]
+    end
 
-- Node.js 20+
-- Docker Desktop (for local backend)
+    subgraph Dev["Local dev only (Vite node process)"]
+        Mid["vite/ferryApi.ts<br/>middleware"]
+        GTFS["TfNSW GTFS API"]
+    end
 
-### Deploy to Fabric (Primary Workflow)
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. Deploy the app to Fabric and start the local dev server:
-
-   ```bash
-   npm run dev
-   ```
-
-3. Open your browser to the Vite dev server URL shown in the terminal.
-
-## Authentication
-
-Authentication is enabled by default.
-In production (after `rayfin up`), users sign in via Fabric Entra SSO.
-For local development (`npm run dev`), a mock auth service auto-signs in with a configurable email/password against the local backend.
-
-The `ServiceContainer` auto-detects the backend URL and selects the right auth service:
-
-- **Localhost** → `MockAuthService` (email/password, auto-creates accounts)
-- **Production** → `RayfinAuthService` → `RayfinFabricAuthService` (Fabric Entra)
-
-Key auth files:
-
-| File | Purpose |
-| --- | --- |
-| `rayfin/rayfin.yml` | Auth service configuration (auth, Fabric, password enabled) |
-| `rayfin/data/Todo.ts` | `@role` decorator with `user_id` policy |
-| `src/hooks/AuthContext.tsx` | Auth state management (React context) |
-| `src/components/AuthPage.tsx` | Sign-in page |
-| `src/components/MockSignInDialog.tsx` | Local dev mock sign-in dialog |
-| `src/pages/AuthCallback.tsx` | Fabric Entra OAuth callback |
-| `src/services/ServiceContainer.ts` | Auth service auto-selection |
-| `src/services/rayfin/RayfinAuthService.ts` | Fabric auth service |
-| `src/services/rayfin/RayfinFabricAuthService.ts` | Fabric Entra provider |
-| `src/services/mock/MockAuthService.ts` | Local dev mock auth |
-| `src/services/interfaces/IAuthService.ts` | Auth service contract |
-
-## Project Structure
-
-```text
-getting-started-auth/
-├── rayfin/
-│   ├── data/
-│   │   ├── Todo.ts            # Todo entity with @role policy and user_id
-│   │   └── schema.ts          # Schema export for type safety
-│   └── rayfin.yml             # Rayfin configuration (auth and data enabled)
-├── src/
-│   ├── components/
-│   │   ├── ui/                # Radix-based UI components (shadcn)
-│   │   ├── AuthPage.tsx       # Fabric sign-in page
-│   │   ├── MockSignInDialog.tsx # Local dev mock sign-in dialog
-│   │   ├── TodoForm.tsx       # New task input
-│   │   ├── TodoItem.tsx       # Individual task with checkbox and delete
-│   │   └── TodoList.tsx       # Todo list container
-│   ├── hooks/
-│   │   ├── AuthContext.tsx    # Authentication state management
-│   │   ├── use-mobile.ts     # Mobile breakpoint hook
-│   │   └── useTodos.ts       # Todo CRUD operations hook
-│   ├── pages/
-│   │   ├── AuthCallback.tsx   # Fabric Entra OAuth callback
-│   │   └── Dashboard.tsx      # Main dashboard with milestones and todos
-│   ├── services/
-│   │   ├── interfaces/
-│   │   │   ├── IAuthService.ts    # Auth service contract
-│   │   │   └── ITodoService.ts    # Todo service contract
-│   │   ├── mock/
-│   │   │   └── MockAuthService.ts # Local dev mock auth
-│   │   ├── rayfin/
-│   │   │   ├── RayfinAuthService.ts       # Fabric auth service
-│   │   │   ├── RayfinFabricAuthService.ts # Fabric Entra provider
-│   │   │   ├── RayfinClientService.ts     # Rayfin client singleton
-│   │   │   └── RayfinTodoService.ts       # Todo data operations
-│   │   └── ServiceContainer.ts  # Service initialization with auth-mode detection
-│   ├── ErrorFallback.tsx      # Error boundary fallback UI
-│   ├── App.tsx                # Router with protected and public routes
-│   └── main.tsx               # Entry point with AuthProvider
-└── package.json
+    UI --> Cesium --> Svc
+    UI --> Auth --> Static
+    Svc -->|prod: direct KQL| Kusto -->|MSAL token| EH
+    Svc -->|dev: /api| Mid -->|az login| EH
+    Mid --> GTFS
+    Static -. serves .-> Browser
 ```
 
-## Data Model
+### Data path — dev vs. production
 
-Three Rayfin entities back the app.
+The frontend always reads from a single configurable base, so only the data
+source changes between environments:
 
-`TourismSite` holds the harbour route and voxel landmark data. It is shared
-reference data readable and seedable by any authenticated user:
+```mermaid
+flowchart TB
+    Feed["ferryService.fetchFerries()"]
+    Feed --> Decide{"hostname<br/>localhost?"}
 
-```typescript
-@entity()
-@authenticated('*')
-export class TourismSite {
-  @uuid() id!: string;
-  @text({ min: 1, max: 100 }) name!: string;
-  @text({ max: 300 }) description!: string;
-  @text({ max: 40 }) category!: string;
-  @int() routeOrder!: number;
-  @decimal() posX!: number;
-  @decimal() posZ!: number;
-  @text({ max: 20 }) color!: string;
-}
+    Decide -->|"yes (dev)"| DevAPI["GET /api/ferries/live<br/>(Vite middleware)"]
+    DevAPI --> AzCli["AzureCliCredential<br/>(az login)"]
+    AzCli --> EH1[("Eventhouse KQL")]
+
+    Decide -->|"no (deployed)"| Direct["queryKusto() direct"]
+    Direct --> MSAL["MSAL token<br/>user_impersonation"]
+    MSAL --> EH2[("Eventhouse KQL<br/>CORS-enabled")]
 ```
 
-`FerryVessel` holds the live position of each ferry cruising the harbour. A
-backend feed (e.g. Transport for NSW real-time positions) keeps these rows
-updated in the same scene-grid space as `TourismSite`, and the scene drives a
-voxel ferry to each vessel's reported position:
+- **Local dev** — a dev-only Vite middleware ([vite/ferryApi.ts](vite/ferryApi.ts))
+  queries the Eventhouse using your local **`az login`** identity and exposes a
+  clean same-origin JSON API. No CORS, no browser tokens.
+- **Deployed** — there is no `/api` middleware, so the browser queries the
+  Eventhouse **directly** ([src/services/kustoClient.ts](src/services/kustoClient.ts))
+  using an MSAL access token for the signed-in Fabric user. The Eventhouse
+  allows CORS from the app origin.
 
-```typescript
-@entity()
-@authenticated('*')
-export class FerryVessel {
-  @uuid() id!: string;
-  @text({ min: 1, max: 100 }) name!: string;
-  @text({ max: 60 }) routeName!: string;
-  @decimal() posX!: number;
-  @decimal() posZ!: number;
-  @decimal() heading!: number;
-  @text({ max: 20 }) color!: string;
-  @date() updatedAt!: Date;
-}
+### Authentication
+
+```mermaid
+flowchart TB
+    Boot["bootstrap.ts"] --> Local{"frontend on<br/>localhost?"}
+    Local -->|yes| Guest["GuestAuthService<br/>(no Fabric popup)"]
+    Local -->|no| Rayfin["RayfinAuthService<br/>(Fabric SSO)"]
+    Guest --> Gate["AuthGuard / AuthContext"]
+    Rayfin --> Gate
+    Gate --> Home["HomePage (protected)"]
+    Home -->|"Connect live data"| Interactive["connectDataInteractive()<br/>MSAL redirect/silent"]
+    Interactive --> Token["cached token → direct KQL"]
 ```
 
-`Todo` remains from the starter template and uses a role-based access policy so
-each authenticated user can only access their own todos:
+App identity uses the **Rayfin Fabric App** auth service. In local dev a
+`GuestAuthService` avoids the Fabric popup; deployed builds use Fabric SSO via
+`RayfinAuthService`. Live-data access to the Eventhouse is a **separate** MSAL
+token acquired silently (or via a user-gesture "Connect live data" button when
+interaction is required).
 
-```typescript
-@entity()
-@role('authenticated', '*', {
-  policy: (claims, item) => claims.sub.eq(item.user_id),
-})
-export class Todo {
-  @uuid() id!: string;
-  @text({ min: 1, max: 100 }) title!: string;
-  @boolean() isCompleted!: boolean;
-  @date() createdAt!: Date;
-  @text() user_id!: string;
-}
+### Frontend module map
+
+```mermaid
+flowchart TB
+    main["main.tsx<br/>(bootstrap + client)"] --> App["App.tsx<br/>(routes + AuthGuard)"]
+    App --> AuthPage["AuthPage.tsx"]
+    App --> Home["HomePage.tsx"]
+    Home --> CesiumView["CesiumView.tsx"]
+    Home --> SidePanel["SidePanel.tsx"]
+    SidePanel --> Fleet["FleetPanel.tsx (live)"]
+    SidePanel --> Sched["SchedulePanel.tsx (GTFS)"]
+    CesiumView --> ferrySvc["services/ferryService.ts"]
+    CesiumView --> buildings["services/buildings.ts (OSM)"]
+    ferrySvc --> kusto["services/kustoClient.ts"]
+    ferrySvc --> contract["shared/contract.ts"]
 ```
 
-## Voxel Harbour Scene
+> **Alternate renderers (not wired into `HomePage`):** the repo also contains a
+> Three.js voxel harbour ([src/three/](src/three/) + [FerryScene.tsx](src/components/FerryScene.tsx))
+> and an Azure Maps 2.5D view ([MapView.tsx](src/components/MapView.tsx) +
+> [SplatHero.tsx](src/components/SplatHero.tsx)). Cesium is the active view; the
+> others are kept as reference implementations.
 
-The 3D scene is rendered with [three.js](https://threejs.org/) in an isometric
-voxel style.
+---
 
-| File | Purpose |
-| --- | --- |
-| `src/components/HarbourScene.tsx` | three.js scene: animated water, sky, ambient life, voxel landmarks, live/looping ferries |
-| `src/components/SiteList.tsx` | HUD list of ferry-route stops |
-| `src/data/harbourSites.ts` | Default Sydney Harbour sites (seed + in-memory fallback) |
-| `src/data/liveFerries.ts` | Fallback/simulated live ferry positions |
-| `src/hooks/useSites.ts` | Loads/seeds `TourismSite` records |
-| `src/hooks/useFerries.ts` | Polls `FerryVessel` positions (simulated fallback) |
-| `src/pages/Dashboard.tsx` | Ferry-world view combining the scene and HUD |
-| `rayfin/data/TourismSite.ts` | `TourismSite` entity |
-| `rayfin/data/FerryVessel.ts` | `FerryVessel` entity (live ferry positions) |
+## Data source
+
+Eventhouse `SydneyFerriesEventhouse` → KQL DB `SydneyFerriesKustoDB`
+(cluster `https://trd-1u2v2sxv19k32hbdcc.z4.kusto.fabric.microsoft.com`).
+
+| Table | Columns |
+|---|---|
+| `SydneyFerries` | `ferry_name`, `ferry_lat`, `ferry_long`, `ferry_destination`, `timestamp` |
+| `ReferenceLocation` | `LocationId`, `LocationName`, `Latitude`, `Longitude`, `ProximityThreshold` |
+
+"Latest position per active ferry" query (anchored to the newest sample so the
+map stays populated even if the simulated feed pauses):
+
+```kusto
+SydneyFerries
+| summarize arg_max(timestamp, *) by ferry_name
+| where timestamp > todatetime('<latest>') - 15m
+| project ferry_name, ferry_lat, ferry_long, ferry_destination, timestamp
+```
+
+---
+
+## Run locally
+
+```bash
+# Deploy backend services (auth + data) to Fabric, then serve the frontend
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) to view the app.
+
+`npm run dev` deploys the backend services (auth + data) to Fabric, then serves
+the frontend on `http://localhost:5173`. **Ferry data in dev** is served by the
+Vite dev middleware ([vite/ferryApi.ts](vite/ferryApi.ts)), so run **`az login`**
+as a user with read access to `SydneyFerriesKustoDB` first. It exposes:
+
+- `GET /api/ferries/live` → `{ asOf, ferries: [...] }`
+- `GET /api/reference-locations` → `{ locations: [...] }`
+- `GET /api/ferries/schedule` → `{ date, asOf, count, departures: [...] }` — today's
+  TfNSW GTFS scheduled departures. Query params: `?scope=all` (whole day; default
+  is upcoming-only) and `?limit=N`.
+
+---
+
+## Configuration (environment variables)
+
+Set in `Test_App/.env` (git-ignored) or the shell.
+
+**Deployed frontend (build-time `VITE_*`):**
+
+| Variable | Purpose |
+|---|---|
+| `VITE_KUSTO_CLUSTER` | Eventhouse cluster URI |
+| `VITE_KUSTO_DATABASE` | KQL database (default `SydneyFerriesKustoDB`) |
+| `VITE_ENTRA_CLIENT_ID` | Entra app (client) ID for interactive sign-in |
+| `VITE_ENTRA_TENANT_ID` | Entra tenant ID |
+| `VITE_KUSTO_SCOPE` | Optional token-scope override (default `<cluster>/user_impersonation`) |
+| `VITE_FERRY_API` | Optional data API base (default `/api`) |
+| `VITE_CESIUM_ION_TOKEN` | Cesium Ion token → world terrain, OSM Buildings, Photorealistic 3D Tiles |
+| `VITE_FERRY_MODEL_URL` | Optional `.glb` ferry model (default `/models/ferry.glb`) |
+| `VITE_RAYFIN_PUBLISHABLE_KEY`, `VITE_FABRIC_WORKSPACE_ID` | Rayfin / Fabric SSO |
+
+**Local dev middleware (server-side):**
+
+| Variable | Purpose |
+|---|---|
+| `KUSTO_CLUSTER_URI`, `KUSTO_DATABASE` | Override the Eventhouse target |
+| `FERRY_ACTIVE_WINDOW` | Active-batch window (default `15m`) |
+| `TFNSW_API_KEY` | TfNSW GTFS key for the schedule route |
+| `TFNSW_FERRY_SCHEDULE_URL` | Override the GTFS endpoint |
+
+> The GTFS timetable needs a secret server-side key, so in the **deployed** app
+> the schedule degrades to empty rather than failing.
+
+---
+
+## Deploy to Fabric
+
+```bash
+# From Test_App/ — builds the frontend (build:fabric) and publishes as
+# Fabric static content behind SSO
+npx rayfin up staticapp deploy -y
+```
+
+Hosting URL: `https://broad-inlet-39886f4465-australiaeast.webapp.fabricapps.net`
+
+---
 
 ## Scripts
 
 | Command | Description |
-| --- | --- |
-| `npm run dev:fabric` | Start dev server against Fabric backend |
-| `npm run dev` | Deploy app to Fabric and start local dev server |
-| `npm run build` | Build for production |
-| `npm run lint` | Run ESLint |
-| `npm run test` | Run tests |
+|---------|-------------|
+| `npm run dev` | Deploy backend services to Fabric and start the local dev server |
+| `npm run build` | Production build (`tsc -b && vite build`) |
+| `npm run build:fabric` | Build for Fabric deployment (entrypoint for `rayfin up staticapp deploy`) |
+| `npm run build:ferry` | Rebuild the bundled ferry `.glb` model |
+| `npm run lint` | Lint with ESLint |
+| `npm run test` | Run unit tests with Vitest |
 | `npm run rayfin:up` | Deploy app to Fabric (no local dev server) |
-| `npm run rayfin:db` | Generate and apply database schema |
 
-## Environment Variables
+---
 
-All Rayfin environment variables live in `rayfin/.env` using the `RAYFIN_PUBLIC_*` prefix.
-The `predev` hook runs `rayfin env --framework vite` to generate `.env.local` with Vite-compatible names.
+## Project structure
 
-| Source (`rayfin/.env`) | Vite variable (`.env.local`) | Description | Default |
-| --- | --- | --- | --- |
-| `RAYFIN_PUBLIC_API_URL` | `VITE_RAYFIN_API_URL` | Rayfin backend URL | `http://localhost:5168` |
-| `RAYFIN_PUBLIC_PUBLISHABLE_KEY` | `VITE_RAYFIN_PUBLISHABLE_KEY` | Rayfin publishable key | (generated on dev) |
-| `RAYFIN_PUBLIC_ITEM_ID` | `VITE_FABRIC_ITEM_ID` | Fabric item/project ID (written by `rayfin up`) | -- |
-| `RAYFIN_PUBLIC_WORKSPACE_ID` | `VITE_FABRIC_WORKSPACE_ID` | Fabric workspace ID for auth | -- |
-| `RAYFIN_PUBLIC_PORTAL_URL` | `VITE_FABRIC_PORTAL_URL` | Fabric portal URL for auth | -- |
+```text
+├── rayfin/
+│   └── rayfin.yml                 # Fabric service config (auth + data + static hosting)
+├── vite/
+│   ├── ferryApi.ts                # Dev-only KQL → JSON API middleware
+│   └── gtfsSchedule.ts            # TfNSW GTFS timetable builder
+├── scripts/
+│   └── build-ferry-glb.mjs        # Bakes the bundled ferry model
+├── public/models/                 # Static 3D assets (ferry.glb)
+└── src/
+    ├── main.tsx                   # Entry point + Rayfin client bootstrap
+    ├── App.tsx                    # Routes and auth gate
+    ├── hooks/AuthContext.tsx      # React context wrapping the auth helpers
+    ├── pages/HomePage.tsx         # App shell: header + CesiumView + SidePanel
+    ├── components/
+    │   ├── AuthPage.tsx           # Sign-in UI
+    │   ├── CesiumView.tsx         # Active 3D globe + ferry rendering
+    │   ├── SidePanel.tsx          # Drawer hosting Fleet + Timetable tabs
+    │   ├── FleetPanel.tsx         # Live fleet list
+    │   ├── SchedulePanel.tsx      # GTFS timetable
+    │   ├── MapView.tsx            # Azure Maps view (alternate, not wired)
+    │   ├── FerryScene.tsx         # Three.js scene (alternate, not wired)
+    │   └── SplatHero.tsx          # Shared HeroFerry types
+    ├── services/
+    │   ├── bootstrap.ts           # Picks Guest vs Rayfin auth service
+    │   ├── ferryService.ts        # Dev /api vs. direct-Kusto data layer
+    │   ├── kustoClient.ts         # Browser MSAL + KQL client (deployed)
+    │   ├── buildings.ts           # OSM (Overpass) building footprints
+    │   ├── IAuthService.ts        # Auth contract + AuthUser type
+    │   ├── GuestAuthService.ts    # Local-dev auth impl
+    │   ├── RayfinAuthService.ts   # Production Fabric SSO impl
+    │   └── rayfinClient.ts        # Typed Rayfin client singleton
+    ├── shared/
+    │   ├── contract.ts            # Ferry / ReferenceLocation / schedule types
+    │   ├── config.ts              # Poll interval, colours, tunables
+    │   └── geo.ts                 # lat/lon → local ENU metres
+    └── three/                     # Three.js SceneEngine / Harbour / FerryManager (alternate)
+```
 
-Deployment metadata (including hosting URL) is stored in `rayfin/.deployments.json`.
-Use `rayfin up list` to view all deployments.
+---
 
-## Next Steps
+## Roadmap
 
-For a more advanced example with categories, relationships, profile images, and dual mock/Rayfin service modes, see the [todo-app](../todo-app/) sample.
-
-## License
-
-See the [LICENSE](LICENSE) file for details.
+- **Production data function (optional):** replace the deployed direct-Kusto
+  path with a **Fabric User Data Function** (Python `fabric-user-data-functions`
+  + `azure-kusto-data`) exposing the same queries, and point `VITE_FERRY_API`
+  at it — no scene changes required.
+- **Server-side GTFS:** proxy the TfNSW timetable through a function so the
+  schedule works in the deployed app.
+- **Voxel coastline (Phase 2):** bake Sydney Harbour coastline GeoJSON
+  (OSM `natural=coastline` via Overpass) into a `harbour.glb` for the Three.js
+  renderer.

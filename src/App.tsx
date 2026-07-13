@@ -2,41 +2,27 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AuthPage } from '@/components/AuthPage';
 import { useAuth } from '@/hooks/AuthContext';
-import { AuthCallback } from '@/pages/AuthCallback.tsx';
-import { Dashboard } from '@/pages/Dashboard';
+import { HomePage } from '@/pages/HomePage';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function AuthGuard({
+  children,
+  requireAuth,
+}: {
+  children: React.ReactNode;
+  requireAuth: boolean;
+}) {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
+  if (requireAuth && !isAuthenticated) return <Navigate to="/auth" replace />;
+  if (!requireAuth && isAuthenticated) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }
@@ -46,21 +32,20 @@ function App() {
     <BrowserRouter>
       {/* ensure all new routes require auth */}
       <Routes>
-        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
           path="/auth"
           element={
-            <PublicRoute>
+            <AuthGuard requireAuth={false}>
               <AuthPage />
-            </PublicRoute>
+            </AuthGuard>
           }
         />
         <Route
           path="/"
           element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
+            <AuthGuard requireAuth={true}>
+              <HomePage />
+            </AuthGuard>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

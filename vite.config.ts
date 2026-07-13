@@ -1,20 +1,19 @@
 import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc';
 import { resolve } from 'path';
+import { defineConfig } from 'vite';
+import cesium from 'vite-plugin-cesium';
 
-const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname;
+import { ferryApiPlugin } from './vite/ferryApi';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), cesium(), ferryApiPlugin()],
   resolve: {
     alias: {
-      '@': resolve(projectRoot, 'src'),
+      '@': resolve(import.meta.dirname, 'src'),
     },
   },
   build: {
-    // Target ES2022 for modern JavaScript decorators
     target: 'es2022',
   },
   esbuild: {

@@ -1,23 +1,21 @@
 import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
-  ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
 } from 'react';
 
-import { ServiceContainer } from '../services/ServiceContainer';
-import { AuthUser } from '../services/interfaces/IAuthService';
-import { MockAuthService } from '../services/mock/MockAuthService';
+import { type AuthUser, type IAuthService } from '@/services/IAuthService';
+import { setKustoLoginHint } from '@/services/kustoClient';
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   error: string | null;
-  signInWithFabric: () => Promise<AuthUser>;
-  signInLocally: (email: string) => Promise<void>;
-  refreshUser: () => Promise<void>;
+  signIn: () => Promise<AuthUser>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   fabricAuthEnabled: boolean;
@@ -27,57 +25,52 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
+  authService: IAuthService;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, authService }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const authService = ServiceContainer.create().authService;
+  // Feed the signed-in user's email to the Eventhouse client so its SSO-silent
+  // token acquisition can target the active session without any popup.
+  useEffect(() => {
+    setKustoLoginHint(user?.email);
+  }, [user]);
 
   useEffect(() => {
+    let cancelled = false;
     authService
       .initEmbeddedAuth()
-      .then((embeddedUser) => {
-        if (embeddedUser) {
-          setUser(embeddedUser);
-          return null;
-        }
-        return authService.getCurrentUser();
-      })
-      .then((currentUser) => {
-        if (currentUser) setUser(currentUser);
+      .then((embedded) => embedded ?? authService.getCurrentUser())
+      .then((current) => {
+        if (!cancelled && current) setUser(current);
       })
       .catch(() => {
-        setUser(null);
+        if (!cancelled) setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [authService]);
 
-  const signInWithFabric = useCallback(async () => {
+  const signIn = useCallback(async () => {
     setError(null);
     setLoading(true);
-
     try {
-      const loggedInUser = await authService.ensureSignedInWithFabric();
+      const loggedInUser = await authService.signIn();
       setUser(loggedInUser);
-      setLoading(false);
       return loggedInUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed';
       setError(message);
-      setLoading(false);
       throw err;
-    }
-  }, [authService]);
-
-  const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-    } catch {
-      setUser(null);
+    } finally {
+      setLoading(false);
     }
   }, [authService]);
 
@@ -91,31 +84,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [authService]);
 
-  const signInLocally = useCallback(
-    async (email: string) => {
-      if (!(authService instanceof MockAuthService)) return;
-      authService.setMockEmail(email);
-      const loggedInUser = await authService.ensureSignedInWithFabric();
-      setUser(loggedInUser);
-    },
-    [authService]
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      loading,
+      error,
+      signIn,
+      signOut,
+      isAuthenticated: !!user,
+      fabricAuthEnabled: authService.fabricAuthEnabled,
+    }),
+    [user, loading, error, signIn, signOut, authService]
   );
 
-  const contextValue: AuthContextValue = {
-    user,
-    loading,
-    error,
-    signInWithFabric,
-    signInLocally,
-    refreshUser,
-    signOut,
-    isAuthenticated: !!user,
-    fabricAuthEnabled: authService.fabricAuthEnabled,
-  };
-
-  return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

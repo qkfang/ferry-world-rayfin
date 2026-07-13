@@ -1,10 +1,4 @@
-**/bin/
-**/obj/
-*.user
-*.suo
-bicep/*.json
-
-# Added by Rayfin CLI
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -12,20 +6,37 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.tsbuildinfo
 .vite
+
+# Test coverage
 coverage
+
+# Local env files (`*.local` matches `.env.local`, `.env.*.local`, etc.)
 *.local
+
+# Secret-bearing root env (holds VITE_AZURE_MAPS_KEY)
+.env
+
+# Rayfin — auto-generated or secret-bearing files
+# `rayfin/.env*` covers .env, .env.bak (emitted by env-file v2 migration with
+# secrets), and any future .env-family files Rayfin's runtime adds.
 rayfin/.env*
 rayfin/.deployments.json
 rayfin/.temp/
+
+# Editor / OS
 .idea
 .DS_Store
+*.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-node_modules
