@@ -16,6 +16,10 @@ dist-ssr
 *.tsbuildinfo
 .vite
 
+# .NET build output
+[Bb]in/
+[Oo]bj/
+
 # Test coverage
 coverage
 

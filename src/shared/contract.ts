@@ -47,6 +47,28 @@ export interface FerryDeparture {
   tripId: string;
 }
 
+/** A single deck of a ferry in the digital twin. */
+export type DeckId = 'lower' | 'upper' | 'bridge';
+
+/** Latest passenger occupancy for one deck, from the digital-twin telemetry. */
+export interface DeckOccupancy {
+  deck: DeckId;
+  /** People currently on this deck. */
+  occupancy: number;
+  /** Deck capacity (from the telemetry attributes). */
+  capacity: number;
+}
+
+/**
+ * Per-ferry digital-twin snapshot: how many passengers are on each deck right
+ * now. Sourced from the `FerryTwinTelemetry` OpenTelemetry metrics in Fabric.
+ */
+export interface FerryTwin {
+  vesselId: string;
+  asOf: string;
+  decks: DeckOccupancy[];
+}
+
 /** Payload returned by GET /api/ferries/schedule. */
 export interface FerryScheduleFeed {
   /** Service date the schedule was computed for (`YYYY-MM-DD`, Sydney). */
