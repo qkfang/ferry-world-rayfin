@@ -87,13 +87,37 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     ferryRef.current = ferry;
     scene.add(ferry.group);
 
+    // Center the vessel and frame it so it fills the screen. We measure the
+    // model's bounding box, aim the orbit target at its centre, and pull the
+    // camera back far enough that the whole ferry fits the current viewport.
+    const bounds = new THREE.Box3().setFromObject(ferry.group);
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    bounds.getCenter(center);
+    bounds.getSize(size);
+    const frame = () => {
+      const { clientWidth: w, clientHeight: h } = mount;
+      const fov = (camera.fov * Math.PI) / 180;
+      const fitH = size.y / 2 / Math.tan(fov / 2);
+      const fitW = size.x / 2 / Math.tan(fov / 2) / Math.max(0.5, w / h);
+      const dist = Math.max(fitH, fitW, size.z / 2) * 1.35;
+      controls.target.set(0, center.y, 0);
+      camera.position.set(dist * 0.72, center.y + size.y * 0.55, dist);
+      controls.minDistance = dist * 0.6;
+      controls.maxDistance = dist * 2.2;
+      controls.update();
+    };
+
     const resize = () => {
       const { clientWidth: w, clientHeight: h } = mount;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
+      // Nudge the framed vessel slightly up and to the left on screen.
+      camera.setViewOffset(w, h, w * 0.1, h * 0.26, w, h);
       camera.updateProjectionMatrix();
     };
     resize();
+    frame();
     const ro = new ResizeObserver(resize);
     ro.observe(mount);
 

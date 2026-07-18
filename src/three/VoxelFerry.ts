@@ -56,14 +56,47 @@ export class VoxelFerry {
   private readonly passengers: Passenger[] = [];
   private readonly perDeck = new Map<DeckId, Passenger[]>();
 
+  // Enclosing surfaces (hull, cabin walls, glazing, roof) are rendered as a
+  // translucent "cutaway" shell so the decks and passengers inside stay
+  // visible from any outside angle. Structural pieces (floors, rails, trim,
+  // funnel) stay opaque so the vessel still reads as solid.
   private readonly mat = {
-    hull: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.6 }),
+    hull: new THREE.MeshStandardMaterial({
+      color: 0x0e7a3d,
+      roughness: 0.6,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
     boot: new THREE.MeshStandardMaterial({ color: 0x14181c, roughness: 0.8 }),
-    cabin: new THREE.MeshStandardMaterial({ color: 0xeee0a4, roughness: 0.7 }),
+    cabin: new THREE.MeshStandardMaterial({
+      color: 0xeee0a4,
+      roughness: 0.7,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
     deck: new THREE.MeshStandardMaterial({ color: 0xb3ab94, roughness: 0.9 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x2a3b47, roughness: 0.2, metalness: 0.6 }),
+    glass: new THREE.MeshStandardMaterial({
+      color: 0x2a3b47,
+      roughness: 0.2,
+      metalness: 0.6,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
     trim: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.5 }),
-    roof: new THREE.MeshStandardMaterial({ color: 0xe7dfc0, roughness: 0.7 }),
+    roof: new THREE.MeshStandardMaterial({
+      color: 0xe7dfc0,
+      roughness: 0.7,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
     rail: new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }),
     funnel: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.6 }),
   };
@@ -119,7 +152,9 @@ export class VoxelFerry {
   private box(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z);
-    mesh.castShadow = true;
+    // Translucent cutaway panels don't cast shadows, so the interior decks and
+    // passengers stay lit and readable through the shell.
+    mesh.castShadow = !(mat as THREE.Material).transparent;
     mesh.receiveShadow = true;
     this.group.add(mesh);
     return mesh;

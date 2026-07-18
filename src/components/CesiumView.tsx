@@ -87,7 +87,7 @@ function flyHome(viewer: Viewer, duration = 1.4): void {
 /** Swoop the camera down to an oblique close-up of a point (a ferry). */
 function flyToPoint(viewer: Viewer, lon: number, lat: number): void {
   viewer.camera.flyTo({
-    destination: Cartesian3.fromDegrees(lon, lat - 0.0016, 300),
+    destination: Cartesian3.fromDegrees(lon, lat - 0.0045, 300),
     orientation: { heading: 0, pitch: CesiumMath.toRadians(-26), roll: 0 },
     duration: 1.4,
   });
