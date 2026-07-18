@@ -26,9 +26,9 @@ interface DeckArea {
 }
 
 const DECK_AREAS: Record<DeckId, DeckArea> = {
-  lower: { deck: 'lower', y: 2.1, minX: -5.4, maxX: 5.4, minZ: -15, maxZ: 12, cap: 34 },
-  upper: { deck: 'upper', y: 7.0, minX: -4.4, maxX: 4.4, minZ: -13, maxZ: 4, cap: 24 },
-  bridge: { deck: 'bridge', y: 7.0, minX: -2.4, maxX: 2.4, minZ: 13, maxZ: 17, cap: 4 },
+  lower: { deck: 'lower', y: 2.1, minX: -6.0, maxX: 6.0, minZ: -17, maxZ: 12, cap: 12 },
+  upper: { deck: 'upper', y: 7.0, minX: -4.8, maxX: 4.8, minZ: -13, maxZ: 5, cap: 8 },
+  bridge: { deck: 'bridge', y: 7.0, minX: -2.0, maxX: 2.0, minZ: 13, maxZ: 16, cap: 1 },
 };
 
 /** A few voxel-character colour packs (skin / shirt / trousers). */
@@ -99,6 +99,9 @@ export class VoxelFerry {
     }),
     rail: new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }),
     funnel: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.6 }),
+    seat: new THREE.MeshStandardMaterial({ color: 0xb23a3a, roughness: 0.75 }),
+    frame: new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 0.5, metalness: 0.4 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.7 }),
   };
 
   constructor() {
