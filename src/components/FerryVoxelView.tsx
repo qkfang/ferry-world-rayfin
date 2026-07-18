@@ -30,8 +30,10 @@ interface FerryVoxelViewProps {
 export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelViewProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const ferryRef = useRef<VoxelFerry | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const [twin, setTwin] = useState<FerryTwin | null>(null);
   const [ticket, setTicket] = useState<PassengerTicket | null>(null);
+  const [autoOrbit, setAutoOrbit] = useState(false);
 
   const total = useMemo(
     () => (twin ? twin.decks.reduce((n, d) => n + d.occupancy, 0) : 0),
@@ -57,8 +59,10 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = true;
+    // Auto-orbit is off by default; toggled on via the on-screen button.
+    controls.autoRotate = false;
     controls.autoRotateSpeed = 0.6;
+    controlsRef.current = controls;
     // Match the earth (Cesium) view: left mouse drags/pans, right mouse orbits.
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.PAN,
@@ -110,7 +114,15 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       const fitW = size.x / 2 / Math.tan(fov / 2) / Math.max(0.5, w / h);
       const dist = Math.max(fitH, fitW, size.z / 2) * 1.35;
       controls.target.set(0, center.y, 0);
-      camera.position.set(dist * 0.72, center.y + size.y * 0.55, dist);
+      // Start rotated 45° to the right for a three-quarter view of the vessel.
+      const az = Math.PI / 4;
+      const px = dist * 0.72;
+      const pz = dist;
+      camera.position.set(
+        px * Math.cos(az) + pz * Math.sin(az),
+        center.y + size.y * 0.55,
+        -px * Math.sin(az) + pz * Math.cos(az),
+      );
       controls.minDistance = dist * 0.6;
       controls.maxDistance = dist * 2.2;
       controls.update();
@@ -148,26 +160,48 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     const ndc = new THREE.Vector2();
     let downX = 0;
     let downY = 0;
-    const onPointerDown = (e: PointerEvent) => {
-      downX = e.clientX;
-      downY = e.clientY;
+
+    // Highlight the passenger currently under the cursor.
+    let hovered: THREE.Object3D | null = null;
+    const setHighlight = (grp: THREE.Object3D | null, on: boolean) => {
+      grp?.traverse((o) => {
+        const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (mat && 'emissive' in mat) {
+          mat.emissive.setHex(on ? 0x38bdf8 : 0x000000);
+          mat.emissiveIntensity = on ? 0.7 : 0;
+        }
+      });
     };
-    const onPointerUp = (e: PointerEvent) => {
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // was a drag
+    const pick = (e: PointerEvent): THREE.Object3D | null => {
       const rect = renderer.domElement.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(ndc, camera);
       const hits = raycaster.intersectObject(ferry.group, true);
       for (const h of hits) {
-        const t = ferry.ticketFor(h.object);
-        if (t) {
-          setTicket(t);
-          return;
-        }
+        const p = ferry.passengerFor(h.object);
+        if (p) return p;
       }
-      setTicket(null);
+      return null;
     };
+    const onPointerMove = (e: PointerEvent) => {
+      const grp = pick(e);
+      if (grp === hovered) return;
+      setHighlight(hovered, false);
+      setHighlight(grp, true);
+      hovered = grp;
+      renderer.domElement.style.cursor = grp ? 'pointer' : '';
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // was a drag
+      const grp = pick(e);
+      setTicket(grp ? (grp.userData.ticket as PassengerTicket) : null);
+    };
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
@@ -175,6 +209,8 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();
+      controlsRef.current = null;
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       ferry.dispose();
@@ -313,6 +349,19 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
         className="absolute right-5 top-4 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-800 shadow hover:bg-white"
       >
         Close
+      </button>
+
+      <button
+        onClick={() => {
+          const next = !autoOrbit;
+          setAutoOrbit(next);
+          if (controlsRef.current) controlsRef.current.autoRotate = next;
+        }}
+        className={`absolute right-24 top-4 rounded-lg px-3 py-1.5 text-sm font-medium shadow ring-1 ring-white/15 ${
+          autoOrbit ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-slate-900/70 text-white/80 hover:bg-slate-800'
+        }`}
+      >
+        Auto orbit {autoOrbit ? 'on' : 'off'}
       </button>
 
       <div className="pointer-events-none absolute bottom-5 right-5 text-xs text-white/50 drop-shadow">

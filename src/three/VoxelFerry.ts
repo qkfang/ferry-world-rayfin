@@ -247,15 +247,20 @@ export class VoxelFerry {
     for (const mat of Object.values(this.mat)) mat.dispose();
   }
 
-  /** Walk up from a raycast-hit object to the passenger it belongs to. */
-  ticketFor(obj: THREE.Object3D | null): PassengerTicket | null {
+  /** Walk up from a raycast-hit object to the passenger group it belongs to. */
+  passengerFor(obj: THREE.Object3D | null): THREE.Object3D | null {
     let o: THREE.Object3D | null = obj;
     while (o) {
-      const t = o.userData?.ticket as PassengerTicket | undefined;
-      if (t) return t;
+      if (o.userData?.ticket) return o;
       o = o.parent;
     }
     return null;
+  }
+
+  /** Walk up from a raycast-hit object to the passenger it belongs to. */
+  ticketFor(obj: THREE.Object3D | null): PassengerTicket | null {
+    const p = this.passengerFor(obj);
+    return p ? (p.userData.ticket as PassengerTicket) : null;
   }
 
   // --- Ferry hull + superstructure -------------------------------------------
