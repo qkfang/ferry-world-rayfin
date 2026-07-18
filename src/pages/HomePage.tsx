@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { CesiumView, type CesiumHandle, type CesiumStatus } from '@/components/CesiumView';
+import { FerryVoxelView } from '@/components/FerryVoxelView';
 import { SidePanel } from '@/components/SidePanel';
 import { useAuth } from '@/hooks/AuthContext';
 import { connectDataInteractive } from '@/services/kustoClient';
@@ -8,6 +9,7 @@ import { connectDataInteractive } from '@/services/kustoClient';
 export function HomePage() {
   const { signOut } = useAuth();
   const cesium = useRef<CesiumHandle>(null);
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
   const [status, setStatus] = useState<CesiumStatus>({
     count: 0,
     asOf: null,
@@ -63,10 +65,18 @@ export function HomePage() {
       {/* ── Map canvas (framed like an app surface) ────────────────────────── */}
       <main className="relative min-h-0 flex-1 p-3">
         <div className="relative h-full w-full overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-2xl">
-          <CesiumView ref={cesium} onStatus={setStatus} />
+          <CesiumView ref={cesium} onStatus={setStatus} onSelectFerry={setSelected} />
           <SidePanel onSelectFerry={(lon, lat) => cesium.current?.flyToFerry(lon, lat)} />
         </div>
       </main>
+
+      {selected && (
+        <FerryVoxelView
+          vesselId={selected.id}
+          vesselName={selected.name}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

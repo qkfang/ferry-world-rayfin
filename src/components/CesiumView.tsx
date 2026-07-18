@@ -146,10 +146,12 @@ export interface CesiumStatus {
 interface CesiumViewProps {
   /** Reports the live ferry count / freshness so the app chrome can show it. */
   onStatus?: (s: CesiumStatus) => void;
+  /** Fired when a ferry is clicked — opens the full-screen voxel ferry view. */
+  onSelectFerry?: (ferry: { id: string; name: string }) => void;
 }
 
 export const CesiumView = forwardRef<CesiumHandle, CesiumViewProps>(function CesiumView(
-  { onStatus },
+  { onStatus, onSelectFerry },
   ref,
 ) {
   const div = useRef<HTMLDivElement>(null);
@@ -165,6 +167,8 @@ export const CesiumView = forwardRef<CesiumHandle, CesiumViewProps>(function Ces
   // always calls the latest callback without re-subscribing).
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
+  const onSelectFerryRef = useRef(onSelectFerry);
+  onSelectFerryRef.current = onSelectFerry;
   useEffect(() => {
     onStatusRef.current?.({ count, asOf, photoreal, needsAuth });
   }, [count, asOf, photoreal, needsAuth]);
@@ -279,7 +283,12 @@ export const CesiumView = forwardRef<CesiumHandle, CesiumViewProps>(function Ces
       const picked = viewer.scene.pick(e.position);
       const id = picked?.id?.id as string | undefined;
       const a = id ? anim.get(id) : undefined;
-      if (a) flyToPoint(viewer, a.target[0], a.target[1]);
+      if (a) {
+        flyToPoint(viewer, a.target[0], a.target[1]);
+        // Open the full-screen voxel ferry view for the clicked vessel.
+        const info = id ? meta.get(id) : undefined;
+        if (id) onSelectFerryRef.current?.({ id, name: info?.name ?? id });
+      }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     const poll = async () => {
