@@ -1,6 +1,7 @@
 import {
   Cartesian2,
   Cartesian3,
+  CameraEventType,
   Color,
   createGooglePhotorealistic3DTileset,
   createOsmBuildingsAsync,
@@ -203,6 +204,11 @@ export const CesiumView = forwardRef<CesiumHandle, CesiumViewProps>(function Ces
     viewer.scene.globe.enableLighting = true;
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
     viewerRef.current = viewer;
+
+    // Right-mouse drag orbits/tilts the view; keep wheel for zoom.
+    const camCtrl = viewer.scene.screenSpaceCameraController;
+    camCtrl.tiltEventTypes = [CameraEventType.RIGHT_DRAG, CameraEventType.PINCH];
+    camCtrl.zoomEventTypes = [CameraEventType.WHEEL, CameraEventType.PINCH];
 
     const abort = new AbortController();
     const shapes = new Map<string, Entity>();

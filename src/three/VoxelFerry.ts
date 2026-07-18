@@ -41,6 +41,102 @@ const PALETTES: { skin: number; shirt: number; trousers: number }[] = [
   { skin: 0xe8b892, shirt: 0x40a0c0, trousers: 0x333a42 },
 ];
 
+/** A whimsical, fictional travel card shown when a passenger is clicked. */
+export interface PassengerTicket {
+  ticketNo: string;
+  name: string;
+  from: string;
+  to: string;
+  journeyMin: number;
+  mood: string;
+  wantsToSee: string;
+  drink: string;
+  deck: string;
+}
+
+const WHARVES = [
+  'Circular Quay',
+  'Manly',
+  'Taronga Zoo',
+  'Watsons Bay',
+  'Darling Harbour',
+  'Barangaroo',
+  'Balmain',
+  'Cockatoo Island',
+  'Mosman Bay',
+  'Double Bay',
+  'Rose Bay',
+  'Neutral Bay',
+];
+const NAMES = [
+  'Ava',
+  'Leo',
+  'Mia',
+  'Noah',
+  'Zoe',
+  'Kai',
+  'Ivy',
+  'Ezra',
+  'Lily',
+  'Finn',
+  'Isla',
+  'Otis',
+];
+const MOODS = [
+  'Relaxed',
+  'Excited',
+  'Sleepy',
+  'Cheerful',
+  'Pensive',
+  'Awe-struck',
+  'Chatty',
+  'Content',
+];
+const SIGHTS = [
+  'the Opera House',
+  'the Harbour Bridge',
+  'the city skyline at dusk',
+  'passing sailboats',
+  'Fort Denison',
+  'the Manly shoreline',
+  'a pod of dolphins',
+  'the ferry wake',
+];
+const DRINKS = [
+  'Flat white',
+  'Long black',
+  'Sparkling water',
+  'Cold beer',
+  'Chai latte',
+  'Lemonade',
+  'Iced tea',
+  'Ginger ale',
+];
+const DECK_NAME: Record<DeckId, string> = {
+  lower: 'Lower saloon',
+  upper: 'Upper deck',
+  bridge: 'Wheelhouse',
+};
+
+const pick = <T>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
+
+function makeTicket(deck: DeckId): PassengerTicket {
+  let from = pick(WHARVES);
+  let to = pick(WHARVES);
+  while (to === from) to = pick(WHARVES);
+  return {
+    ticketNo: 'SF-' + Math.floor(1000 + Math.random() * 9000),
+    name: pick(NAMES),
+    from,
+    to,
+    journeyMin: 8 + Math.floor(Math.random() * 38),
+    mood: pick(MOODS),
+    wantsToSee: pick(SIGHTS),
+    drink: pick(DRINKS),
+    deck: DECK_NAME[deck],
+  };
+}
+
 interface Passenger {
   group: THREE.Group;
   area: DeckArea;
@@ -49,6 +145,7 @@ interface Passenger {
   phase: number;
   legL: THREE.Mesh;
   legR: THREE.Mesh;
+  ticket: PassengerTicket;
 }
 
 export class VoxelFerry {
@@ -150,6 +247,17 @@ export class VoxelFerry {
     for (const mat of Object.values(this.mat)) mat.dispose();
   }
 
+  /** Walk up from a raycast-hit object to the passenger it belongs to. */
+  ticketFor(obj: THREE.Object3D | null): PassengerTicket | null {
+    let o: THREE.Object3D | null = obj;
+    while (o) {
+      const t = o.userData?.ticket as PassengerTicket | undefined;
+      if (t) return t;
+      o = o.parent;
+    }
+    return null;
+  }
+
   // --- Ferry hull + superstructure -------------------------------------------
 
   private box(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh {
@@ -170,8 +278,8 @@ export class VoxelFerry {
     this.box(m.boot, 13.2, 0.6, 40.2, 0, -0.4, 0);
     // Tapered bow block.
     this.box(m.hull, 8, 2.2, 5, 0, 0.9, 21.5);
-    // Lower deck floor.
-    this.box(m.deck, 12, 0.3, 34, 0, 2.0, -1);
+    // Lower deck floor (widened for more usable saloon space).
+    this.box(m.deck, 12.6, 0.3, 36, 0, 2.0, -1);
 
     // Lower saloon (enclosed cabin) with a dark glazing band + roof.
     this.box(m.cabin, 11.5, 3.4, 30, 0, 3.9, -2);
@@ -183,8 +291,8 @@ export class VoxelFerry {
     this.railRect(-6, 6, 13, 17.5, 2.3);
     this.railRect(-6, 6, -17, -12, 2.3);
 
-    // Upper deck floor + set-back saloon.
-    this.box(m.deck, 10, 0.3, 24, 0, 6.85, -4);
+    // Upper deck floor + set-back saloon (widened for a roomier lounge).
+    this.box(m.deck, 10.6, 0.3, 26, 0, 6.85, -4);
     this.box(m.cabin, 9.5, 2.8, 20, 0, 8.4, -5);
     this.box(m.glass, 9.7, 1.3, 18, 0, 8.7, -5);
     this.box(m.trim, 9.8, 0.35, 20.2, 0, 9.9, -5);
@@ -203,6 +311,87 @@ export class VoxelFerry {
     // Aft funnel.
     this.box(m.funnel, 2.2, 3.2, 2.2, 0, 8.4, -13);
     this.box(m.boot, 2.4, 0.4, 2.4, 0, 10.0, -13);
+
+    this.furnish();
+  }
+
+  /** Seats, bar, captain's pit and open-air benches that dress each deck. */
+  private furnish(): void {
+    // Lower saloon: forward-facing seat rows either side of a central aisle.
+    for (const z of [7, 3, -1, -5]) {
+      this.chair(-5.0, 2.15, z, -1);
+      this.chair(-3.6, 2.15, z, -1);
+      this.chair(3.6, 2.15, z, -1);
+      this.chair(5.0, 2.15, z, -1);
+    }
+    // Lower saloon bar with stools, against the aft bulkhead.
+    this.bar(0, 2.15, -12);
+
+    // Upper saloon: a lounge of seats plus a small refreshment kiosk aft.
+    for (const z of [1, -3, -7]) {
+      this.chair(-3.8, 7.0, z, -1);
+      this.chair(3.8, 7.0, z, -1);
+    }
+    this.bar(0, 7.0, -12, 0.7);
+
+    // Captain's pit in the forward wheelhouse.
+    this.captainPit();
+
+    // Open-air benches on the bow and stern decks.
+    this.bench(-3.2, 2.3, 15.5);
+    this.bench(3.2, 2.3, 15.5);
+    this.bench(-3.2, 2.3, -15);
+    this.bench(3.2, 2.3, -15);
+  }
+
+  /** A single voxel seat; dir = -1 backrest aft, +1 backrest forward. */
+  private chair(x: number, y: number, z: number, dir: 1 | -1): void {
+    const s = this.mat.seat;
+    const f = this.mat.frame;
+    this.box(s, 0.9, 0.16, 0.9, x, y + 0.5, z);
+    this.box(s, 0.9, 0.9, 0.16, x, y + 0.95, z + dir * 0.42);
+    for (const sx of [-0.35, 0.35])
+      for (const sz of [-0.35, 0.35]) this.box(f, 0.12, 0.5, 0.12, x + sx, y + 0.25, z + sz);
+  }
+
+  /** A bar counter with a bottle shelf and stools. `scale` shrinks a kiosk. */
+  private bar(x: number, y: number, z: number, scale = 1): void {
+    const w = 5 * scale;
+    const wood = this.mat.wood;
+    this.box(wood, w, 1.1, 1.4, x, y + 0.55, z);
+    this.box(this.mat.trim, w + 0.4, 0.14, 1.7, x, y + 1.18, z);
+    this.box(wood, w, 1.6, 0.4, x, y + 0.8, z - 1.6);
+    const bottles = Math.round(w);
+    for (let i = 0; i < bottles; i++)
+      this.box(this.mat.glass, 0.16, 0.5, 0.16, x - w / 2 + 0.5 + i, y + 1.75, z - 1.6);
+    const stools = Math.max(2, Math.round(w / 1.4));
+    for (let i = 0; i < stools; i++) {
+      const sx = x - (w / 2 - 0.6) + (i * (w - 1.2)) / Math.max(1, stools - 1);
+      this.box(this.mat.frame, 0.5, 0.16, 0.5, sx, y + 0.75, z + 1.2);
+      this.box(this.mat.frame, 0.1, 0.75, 0.1, sx, y + 0.37, z + 1.2);
+    }
+  }
+
+  /** An open-air bench for the outdoor decks. */
+  private bench(x: number, y: number, z: number): void {
+    const wood = this.mat.wood;
+    const f = this.mat.frame;
+    this.box(wood, 3, 0.16, 0.7, x, y + 0.5, z);
+    this.box(wood, 3, 0.7, 0.16, x, y + 0.85, z - 0.3);
+    this.box(f, 0.12, 0.5, 0.12, x - 1.3, y + 0.25, z);
+    this.box(f, 0.12, 0.5, 0.12, x + 1.3, y + 0.25, z);
+  }
+
+  /** The captain's driving pit: console, wheel and seat in the wheelhouse. */
+  private captainPit(): void {
+    const y = 7.0;
+    this.box(this.mat.boot, 3.4, 1.0, 1.0, 0, y + 0.5, 15.8);
+    this.box(this.mat.glass, 3.2, 0.5, 0.25, 0, y + 1.15, 15.4);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.09, 8, 20), this.mat.frame);
+    wheel.position.set(0, y + 1.15, 15.1);
+    wheel.castShadow = true;
+    this.group.add(wheel);
+    this.chair(0, y, 13.9, -1);
   }
 
   /** A simple voxel railing around a rectangular open deck at height `y`. */
@@ -267,6 +456,8 @@ export class VoxelFerry {
     const { group, legL, legR } = this.buildFigure();
     const start = this.randomPoint(area);
     group.position.copy(start);
+    const ticket = makeTicket(area.deck);
+    group.userData.ticket = ticket;
     this.group.add(group);
     const p: Passenger = {
       group,
@@ -276,6 +467,7 @@ export class VoxelFerry {
       phase: Math.random() * Math.PI * 2,
       legL,
       legR,
+      ticket,
     };
     list.push(p);
     this.passengers.push(p);

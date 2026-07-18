@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { fetchFerryTwin } from '@/services/twinService';
 import type { FerryTwin } from '@/shared/contract';
 import { VoxelFerry } from '@/three/VoxelFerry';
+import type { PassengerTicket } from '@/three/VoxelFerry';
 
 const DECK_LABEL: Record<string, string> = {
   lower: 'Lower saloon',
@@ -30,6 +31,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
   const mountRef = useRef<HTMLDivElement>(null);
   const ferryRef = useRef<VoxelFerry | null>(null);
   const [twin, setTwin] = useState<FerryTwin | null>(null);
+  const [ticket, setTicket] = useState<PassengerTicket | null>(null);
 
   const total = useMemo(
     () => (twin ? twin.decks.reduce((n, d) => n + d.occupancy, 0) : 0),
@@ -57,6 +59,12 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     controls.enableDamping = true;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.6;
+    // Match the earth (Cesium) view: left mouse drags/pans, right mouse orbits.
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
     controls.target.set(0, 6, 0);
     controls.minDistance = 25;
     controls.maxDistance = 110;
@@ -135,10 +143,40 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     };
     raf = requestAnimationFrame(tick);
 
+    // Click a voxel passenger to reveal their (fictional) travel card.
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    let downX = 0;
+    let downY = 0;
+    const onPointerDown = (e: PointerEvent) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // was a drag
+      const rect = renderer.domElement.getBoundingClientRect();
+      ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(ndc, camera);
+      const hits = raycaster.intersectObject(ferry.group, true);
+      for (const h of hits) {
+        const t = ferry.ticketFor(h.object);
+        if (t) {
+          setTicket(t);
+          return;
+        }
+      }
+      setTicket(null);
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
       ferry.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
@@ -216,6 +254,60 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
         {!twin && <p className="text-[12px] text-white/40">Loading twin telemetry…</p>}
       </div>
 
+      {/* Passenger travel card, shown when a voxel figure is clicked */}
+      {ticket && (
+        <div className="absolute right-5 top-16 w-72 rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300/80">
+                Passenger ticket
+              </div>
+              <div className="mt-0.5 text-lg font-semibold">{ticket.name}</div>
+            </div>
+            <button
+              onClick={() => setTicket(null)}
+              className="rounded-md px-1.5 text-white/50 hover:text-white"
+              aria-label="Dismiss ticket"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <span className="font-medium">{ticket.from}</span>
+            <span className="text-white/40">→</span>
+            <span className="font-medium">{ticket.to}</span>
+          </div>
+
+          <dl className="mt-3 space-y-1.5 text-[13px]">
+            <div className="flex justify-between">
+              <dt className="text-white/50">Journey</dt>
+              <dd className="tabular-nums">{ticket.journeyMin} min</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-white/50">Aboard</dt>
+              <dd>{ticket.deck}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-white/50">Mood</dt>
+              <dd>{ticket.mood}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-white/50">Wants to see</dt>
+              <dd className="text-right">{ticket.wantsToSee}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-white/50">Drink</dt>
+              <dd>{ticket.drink}</dd>
+            </div>
+          </dl>
+
+          <div className="mt-3 border-t border-white/10 pt-2 text-[11px] text-white/40">
+            Ticket {ticket.ticketNo}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={onClose}
         className="absolute right-5 top-4 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-800 shadow hover:bg-white"
@@ -224,7 +316,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       </button>
 
       <div className="pointer-events-none absolute bottom-5 right-5 text-xs text-white/50 drop-shadow">
-        Drag to orbit · scroll to zoom · Esc to close
+        Click a passenger · left-drag to pan · right-drag to rotate · scroll to zoom · Esc to close
       </div>
     </div>
   );
