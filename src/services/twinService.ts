@@ -3,7 +3,7 @@ import type { DeckId, DeckOccupancy, FerryTwin } from '@/shared/contract';
 import { colIndex, isDirectKustoConfigured, queryKusto } from './kustoClient';
 
 /**
- * Digital-twin data path. The `.NET` simulator ingests per-deck passenger
+ * Digital-twin data path. The .NET simulator ingests per-deck passenger
  * occupancy into the Fabric Eventhouse table `FerryTwinTelemetry` using the
  * OpenTelemetry metrics data model (MetricName `ferry.deck.occupancy`). The
  * deployed app reads the latest value per deck directly via KQL; local dev has
@@ -11,10 +11,12 @@ import { colIndex, isDirectKustoConfigured, queryKusto } from './kustoClient';
  * ferry view still shows passengers walking around.
  */
 
+// Deck capacities mirror the .NET simulator (TwinSimulatorService.DeckCapacities)
+// so the client-side fallback matches the values ingested into Fabric.
 const DECKS: { deck: DeckId; capacity: number }[] = [
-  { deck: 'lower', capacity: 140 },
+  { deck: 'lower', capacity: 120 },
   { deck: 'upper', capacity: 90 },
-  { deck: 'bridge', capacity: 4 },
+  { deck: 'bridge', capacity: 12 },
 ];
 
 const useDirectKusto = isDirectKustoConfigured();
