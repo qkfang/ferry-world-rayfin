@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { fetchFerryTwin } from '@/services/twinService';
 import type { FerryTwin } from '@/shared/contract';
 import { VoxelFerry } from '@/three/VoxelFerry';
-import type { PassengerTicket } from '@/three/VoxelFerry';
+import type { PassengerTicket, StaffCard } from '@/three/VoxelFerry';
 
 const DECK_LABEL: Record<string, string> = {
   lower: 'Lower saloon',
@@ -33,6 +33,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
   const controlsRef = useRef<OrbitControls | null>(null);
   const [twin, setTwin] = useState<FerryTwin | null>(null);
   const [ticket, setTicket] = useState<PassengerTicket | null>(null);
+  const [staff, setStaff] = useState<StaffCard | null>(null);
   const [autoOrbit, setAutoOrbit] = useState(false);
 
   const total = useMemo(
@@ -199,7 +200,8 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     const onPointerUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // was a drag
       const grp = pick(e);
-      setTicket(grp ? (grp.userData.ticket as PassengerTicket) : null);
+      setStaff(grp ? ((grp.userData.staff as StaffCard) ?? null) : null);
+      setTicket(grp ? ((grp.userData.ticket as PassengerTicket) ?? null) : null);
     };
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -341,6 +343,46 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
           <div className="mt-3 border-t border-white/10 pt-2 text-[11px] text-white/40">
             Ticket {ticket.ticketNo}
           </div>
+        </div>
+      )}
+
+      {/* Crew card, shown when a uniformed staff figure is clicked */}
+      {staff && (
+        <div className="absolute right-5 top-16 w-72 rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300/80">
+                Ferry crew
+              </div>
+              <div className="mt-0.5 text-lg font-semibold">{staff.name}</div>
+            </div>
+            <button
+              onClick={() => setStaff(null)}
+              className="rounded-md px-1.5 text-white/50 hover:text-white"
+              aria-label="Dismiss crew card"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mt-2 inline-block rounded-md bg-sky-500/20 px-2 py-0.5 text-sm font-medium text-sky-200">
+            {staff.role}
+          </div>
+
+          <dl className="mt-3 space-y-1.5 text-[13px]">
+            <div className="flex justify-between">
+              <dt className="text-white/50">Station</dt>
+              <dd>{staff.station}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-white/50">Duty</dt>
+              <dd className="text-right">{staff.duty}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-white/50">Status</dt>
+              <dd className="text-emerald-300">On duty</dd>
+            </div>
+          </dl>
         </div>
       )}
 
