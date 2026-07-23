@@ -1,0 +1,23 @@
+Ferry photo sources (Wikimedia Commons, CC BY-SA / public domain licensed uploads)
+
+Borrowdale.jpg       https://commons.wikimedia.org/wiki/File:Sydney_Ferry_Borrowdale_1.jpg
+Esme_Timbery.jpg     https://commons.wikimedia.org/wiki/File:MV_Esme_Timbery_01_C.jpg
+Fishburn.jpg         https://commons.wikimedia.org/wiki/File:Sydney_Ferry_Fishburn_1.jpg
+Frances_Bodkin.jpg   https://commons.wikimedia.org/wiki/File:Parramatta-Class_ferry_MV_Frances_Bodkin_at_Circular_Quay.jpg
+Friendship.jpg       https://commons.wikimedia.org/wiki/File:Sydney-ferry-Friendship-at-Circular-Quay.jpg
+Golden_Grove.jpg     https://commons.wikimedia.org/wiki/File:Sydney_Ferry_Golden_Grove_1.jpg
+Jack_Mundey.jpg      https://commons.wikimedia.org/wiki/File:Parramatta_River_Class_ferry_MV_Jack_Mundey_Cockatoo_Island.jpg
+John_Nutt.jpg        https://commons.wikimedia.org/wiki/File:John_Nutt_Ferry.jpg
+Lauren_Jackson.jpg   https://commons.wikimedia.org/wiki/File:Lauren_Jackson_(ship).jpg
+Margaret_Olley.jpg   https://commons.wikimedia.org/wiki/File:Margaret_Olley_(ship).jpg
+Martin_Green.jpg     https://commons.wikimedia.org/wiki/File:Parramatta_River_Class_ferry_MV_Martin_Green_Putney_(cropped).jpg
+May_Gibbs.jpg        https://commons.wikimedia.org/wiki/File:May_Gibbs_Ferry.jpg
+Me-mel.jpg           https://commons.wikimedia.org/wiki/File:Me-Mel_ferry.jpg
+Norman_Selfe.jpg     https://commons.wikimedia.org/wiki/File:Parramatta_River_Class_ferry_MV_Norman_Selfe_Ryde.jpg
+Queenscliff.jpg      https://commons.wikimedia.org/wiki/File:Sydney_ferry_QUEENSCLIFF_arriving_at_Manly_Wharf.jpg
+Ruby_Langford.jpg    https://commons.wikimedia.org/wiki/File:Sirius,_Ruby_Langford_Ginibi,_Circular_Quay,_2022_(01).jpg
+Ruth_Park.jpg        https://commons.wikimedia.org/wiki/File:Ruth_Park_(ship).jpg
+Sirius.jpg           https://commons.wikimedia.org/wiki/File:Sydney_ferry_SIRIUS_at_Circular_Quay_in_her_original_livery_1985.jpg
+Victor_Chang.jpg     https://commons.wikimedia.org/wiki/File:Sydney_Victor_Chang_at_Rose_Bay_wharf.jpg
+
+Reference: https://en.wikipedia.org/wiki/Sydney_Ferries
