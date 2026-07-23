@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { fetchFerryTwin } from '@/services/twinService';
 import type { FerryTwin } from '@/shared/contract';
+import { ferryPhotoUrl, getFerrySpec } from '@/three/ferries';
 import { VoxelFerry } from '@/three/VoxelFerry';
 import type { PassengerTicket } from '@/three/VoxelFerry';
 
@@ -37,6 +38,8 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     () => (twin ? twin.decks.reduce((n, d) => n + d.occupancy, 0) : 0),
     [twin],
   );
+  const spec = useMemo(() => getFerrySpec(vesselName), [vesselName]);
+  const photoUrl = useMemo(() => ferryPhotoUrl(vesselName), [vesselName]);
 
   // ── Three.js scene ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,7 +94,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     water.receiveShadow = true;
     scene.add(water);
 
-    const ferry = new VoxelFerry();
+    const ferry = new VoxelFerry(spec);
     ferryRef.current = ferry;
     scene.add(ferry.group);
 
@@ -181,7 +184,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, []);
+  }, [spec]);
 
   // ── Poll digital-twin occupancy ───────────────────────────────────────────
   useEffect(() => {
@@ -223,9 +226,17 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       <div className="pointer-events-none absolute left-5 top-4 select-none">
         <h2 className="text-xl font-semibold text-white drop-shadow">{vesselName}</h2>
         <p className="mt-1 text-sm text-white/70 drop-shadow">
-          Digital twin · {total} passengers aboard
+          {spec.fleetClass} · Digital twin · {total} passengers aboard
         </p>
       </div>
+
+      {/* Real reference photo of the actual ferry, for comparison with the voxel model */}
+      {photoUrl && (
+        <div className="absolute right-5 bottom-16 w-56 overflow-hidden rounded-xl bg-slate-950/70 shadow-xl ring-1 ring-white/10">
+          <img src={photoUrl} alt={vesselName} className="h-32 w-full object-cover" />
+          <div className="px-3 py-2 text-[11px] text-white/60">{spec.fleetClass}</div>
+        </div>
+      )}
 
       {/* Deck occupancy readout from the twin telemetry */}
       <div className="absolute bottom-5 left-5 w-64 rounded-xl bg-slate-950/70 p-3 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">

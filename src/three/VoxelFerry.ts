@@ -1,13 +1,18 @@
 import * as THREE from 'three';
 
 import type { DeckId, DeckOccupancy } from '@/shared/contract';
+import { DEFAULT_FERRY_SPEC } from '@/three/ferries/types';
+import type { FerryModelSpec } from '@/three/ferries/types';
 
 /**
  * A blocky, voxel-style ferry built entirely from boxes — a lower enclosed
- * saloon, a set-back upper deck, and a forward wheelhouse (the "driving"
+ * saloon, an optional set-back upper deck, and a wheelhouse (the "driving"
  * capital section) — populated with little voxel passengers that walk around
- * each deck. Passenger counts are driven by the Fabric digital-twin occupancy
- * so the scene mirrors what the telemetry reports. Voxel look and character
+ * each deck. Hull proportions, livery colours, deck count and hull type (twin
+ * catamaran pontoons vs. a single monohull) come from a `FerryModelSpec` so
+ * each real vessel (see `src/three/ferries/`) renders with its own look.
+ * Passenger counts are driven by the Fabric digital-twin occupancy so the
+ * scene mirrors what the telemetry reports. Voxel look and character
  * construction follow the design of qkfang/zava-claims-agent.
  *
  * Bow points +Z. Local units are roughly metres.
@@ -25,11 +30,44 @@ interface DeckArea {
   cap: number;
 }
 
-const DECK_AREAS: Record<DeckId, DeckArea> = {
-  lower: { deck: 'lower', y: 2.1, minX: -6.0, maxX: 6.0, minZ: -17, maxZ: 12, cap: 12 },
-  upper: { deck: 'upper', y: 7.0, minX: -4.8, maxX: 4.8, minZ: -13, maxZ: 5, cap: 8 },
-  bridge: { deck: 'bridge', y: 7.0, minX: -2.0, maxX: 2.0, minZ: 13, maxZ: 16, cap: 1 },
-};
+/** Deck walk areas scaled to the vessel's hull length/beam; `upper` is omitted
+ * for single-deck vessels so no passengers spawn on a deck that doesn't exist. */
+function buildDeckAreas(spec: FerryModelSpec): Partial<Record<DeckId, DeckArea>> {
+  const { length: lengthScale, beam: beamScale } = spec.scale;
+  const areas: Partial<Record<DeckId, DeckArea>> = {
+    lower: {
+      deck: 'lower',
+      y: 2.1,
+      minX: -6.0 * beamScale,
+      maxX: 6.0 * beamScale,
+      minZ: -17 * lengthScale,
+      maxZ: 12 * lengthScale,
+      cap: 12,
+    },
+  };
+  const bridgeY = spec.decks === 2 ? 7.0 : 4.6;
+  if (spec.decks === 2) {
+    areas.upper = {
+      deck: 'upper',
+      y: 7.0,
+      minX: -4.8 * beamScale,
+      maxX: 4.8 * beamScale,
+      minZ: -13 * lengthScale,
+      maxZ: 5 * lengthScale,
+      cap: 8,
+    };
+  }
+  areas.bridge = {
+    deck: 'bridge',
+    y: bridgeY,
+    minX: -2.0 * beamScale,
+    maxX: 2.0 * beamScale,
+    minZ: 13 * lengthScale,
+    maxZ: 16 * lengthScale,
+    cap: 1,
+  };
+  return areas;
+}
 
 /** A few voxel-character colour packs (skin / shirt / trousers). */
 const PALETTES: { skin: number; shirt: number; trousers: number }[] = [
@@ -150,66 +188,76 @@ interface Passenger {
 
 export class VoxelFerry {
   readonly group = new THREE.Group();
+  private readonly spec: FerryModelSpec;
+  private readonly deckAreas: Partial<Record<DeckId, DeckArea>>;
   private readonly passengers: Passenger[] = [];
   private readonly perDeck = new Map<DeckId, Passenger[]>();
 
   // Enclosing surfaces (hull, cabin walls, glazing, roof) are rendered as a
   // translucent "cutaway" shell so the decks and passengers inside stay
   // visible from any outside angle. Structural pieces (floors, rails, trim,
-  // funnel) stay opaque so the vessel still reads as solid.
-  private readonly mat = {
-    hull: new THREE.MeshStandardMaterial({
-      color: 0x0e7a3d,
-      roughness: 0.6,
-      transparent: true,
-      opacity: 0.3,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-    boot: new THREE.MeshStandardMaterial({ color: 0x14181c, roughness: 0.8 }),
-    cabin: new THREE.MeshStandardMaterial({
-      color: 0xeee0a4,
-      roughness: 0.7,
-      transparent: true,
-      opacity: 0.28,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-    deck: new THREE.MeshStandardMaterial({ color: 0xb3ab94, roughness: 0.9 }),
-    glass: new THREE.MeshStandardMaterial({
-      color: 0x2a3b47,
-      roughness: 0.2,
-      metalness: 0.6,
-      transparent: true,
-      opacity: 0.22,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-    trim: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.5 }),
-    roof: new THREE.MeshStandardMaterial({
-      color: 0xe7dfc0,
-      roughness: 0.7,
-      transparent: true,
-      opacity: 0.3,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-    rail: new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }),
-    funnel: new THREE.MeshStandardMaterial({ color: 0x0e7a3d, roughness: 0.6 }),
-    seat: new THREE.MeshStandardMaterial({ color: 0xb23a3a, roughness: 0.75 }),
-    frame: new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 0.5, metalness: 0.4 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.7 }),
-  };
+  // funnel) stay opaque so the vessel still reads as solid. Colours come from
+  // the ferry's livery spec so each real vessel matches its own reference photo.
+  private readonly mat: Record<
+    'hull' | 'boot' | 'cabin' | 'deck' | 'glass' | 'trim' | 'roof' | 'rail' | 'funnel' | 'seat' | 'frame' | 'wood',
+    THREE.MeshStandardMaterial
+  >;
 
-  constructor() {
+  constructor(spec: FerryModelSpec = DEFAULT_FERRY_SPEC) {
+    this.spec = spec;
+    this.deckAreas = buildDeckAreas(spec);
+    const { livery } = spec;
+    this.mat = {
+      hull: new THREE.MeshStandardMaterial({
+        color: livery.hull,
+        roughness: 0.6,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+      boot: new THREE.MeshStandardMaterial({ color: livery.boot, roughness: 0.8 }),
+      cabin: new THREE.MeshStandardMaterial({
+        color: livery.cabin,
+        roughness: 0.7,
+        transparent: true,
+        opacity: 0.28,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+      deck: new THREE.MeshStandardMaterial({ color: 0xb3ab94, roughness: 0.9 }),
+      glass: new THREE.MeshStandardMaterial({
+        color: livery.glass,
+        roughness: 0.2,
+        metalness: 0.6,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+      trim: new THREE.MeshStandardMaterial({ color: livery.trim, roughness: 0.5 }),
+      roof: new THREE.MeshStandardMaterial({
+        color: livery.roof,
+        roughness: 0.7,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+      rail: new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }),
+      funnel: new THREE.MeshStandardMaterial({ color: livery.funnel, roughness: 0.6 }),
+      seat: new THREE.MeshStandardMaterial({ color: 0xb23a3a, roughness: 0.75 }),
+      frame: new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 0.5, metalness: 0.4 }),
+      wood: new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.7 }),
+    };
     this.buildFerry();
-    for (const d of Object.keys(DECK_AREAS) as DeckId[]) this.perDeck.set(d, []);
+    for (const d of Object.keys(this.deckAreas) as DeckId[]) this.perDeck.set(d, []);
   }
 
   /** Match the number of rendered figures on each deck to the twin occupancy. */
   setOccupancy(decks: DeckOccupancy[]): void {
     for (const d of decks) {
-      const area = DECK_AREAS[d.deck];
+      const area = this.deckAreas[d.deck];
       if (!area) continue;
       const want = Math.min(area.cap, Math.round((d.occupancy / Math.max(1, d.capacity)) * area.cap));
       const list = this.perDeck.get(d.deck)!;
@@ -271,77 +319,118 @@ export class VoxelFerry {
     return mesh;
   }
 
+  /** Centre of the wheelhouse block: forward on classic double-decked ferries,
+   * built into the single saloon's roof on modern single-deck catamarans. */
+  private wheelhouseCenter(): { y: number; z: number } {
+    const { decks, wheelhouse, scale } = this.spec;
+    return {
+      y: decks === 2 ? 8.5 : 6.0,
+      z: (wheelhouse === 'forward' ? 14.5 : -2) * scale.length,
+    };
+  }
+
   private buildFerry(): void {
     const m = this.mat;
-    // Hull + waterline boot-top.
-    this.box(m.hull, 13, 2.4, 40, 0, 0.8, 0);
-    this.box(m.boot, 13.2, 0.6, 40.2, 0, -0.4, 0);
-    // Tapered bow block.
-    this.box(m.hull, 8, 2.2, 5, 0, 0.9, 21.5);
+    const { hullType, scale, decks, hasFunnel } = this.spec;
+    const L = scale.length;
+    const B = scale.beam;
+    const beam = 13 * B;
+    const hullLen = 40 * L;
+    const bowZ = 21.5 * L;
+    const bowLen = 5 * L;
+
+    // Hull + waterline boot-top. Catamarans get twin pontoons either side of
+    // the centreline gap; a monohull (e.g. Freshwater class) gets one hull.
+    if (hullType === 'catamaran') {
+      const pontoonW = beam * 0.36;
+      const half = (pontoonW + beam * 0.1) / 2;
+      for (const side of [-1, 1] as const) {
+        const x = side * half;
+        this.box(m.hull, pontoonW, 2.4, hullLen, x, 0.8, 0);
+        this.box(m.boot, pontoonW + 0.2, 0.6, hullLen + 0.2, x, -0.4, 0);
+        this.box(m.hull, pontoonW * 0.85, 2.2, bowLen, x, 0.9, bowZ);
+      }
+    } else {
+      this.box(m.hull, beam, 2.4, hullLen, 0, 0.8, 0);
+      this.box(m.boot, beam + 0.2, 0.6, hullLen + 0.2, 0, -0.4, 0);
+      this.box(m.hull, beam * 0.62, 2.2, bowLen, 0, 0.9, bowZ);
+    }
+
     // Lower deck floor (widened for more usable saloon space).
-    this.box(m.deck, 12.6, 0.3, 36, 0, 2.0, -1);
+    this.box(m.deck, beam * 0.97, 0.3, hullLen * 0.9, 0, 2.0, -1 * L);
 
     // Lower saloon (enclosed cabin) with a dark glazing band + roof.
-    this.box(m.cabin, 11.5, 3.4, 30, 0, 3.9, -2);
-    this.box(m.glass, 11.7, 1.5, 28, 0, 4.3, -2);
-    this.box(m.trim, 11.8, 0.4, 30.2, 0, 5.7, -2);
-    this.box(m.roof, 12, 0.5, 30.5, 0, 6.0, -2);
+    this.box(m.cabin, beam * 0.885, 3.4, hullLen * 0.75, 0, 3.9, -2 * L);
+    this.box(m.glass, beam * 0.9, 1.5, hullLen * 0.7, 0, 4.3, -2 * L);
+    this.box(m.trim, beam * 0.91, 0.4, hullLen * 0.755, 0, 5.7, -2 * L);
+    this.box(m.roof, beam * 0.925, 0.5, hullLen * 0.7625, 0, 6.0, -2 * L);
 
     // Open lower fore/aft decks get simple perimeter rails.
-    this.railRect(-6, 6, 13, 17.5, 2.3);
-    this.railRect(-6, 6, -17, -12, 2.3);
+    this.railRect(-beam * 0.46, beam * 0.46, 13 * L, 17.5 * L, 2.3);
+    this.railRect(-beam * 0.46, beam * 0.46, -17 * L, -12 * L, 2.3);
 
-    // Upper deck floor + set-back saloon (widened for a roomier lounge).
-    this.box(m.deck, 10.6, 0.3, 26, 0, 6.85, -4);
-    this.box(m.cabin, 9.5, 2.8, 20, 0, 8.4, -5);
-    this.box(m.glass, 9.7, 1.3, 18, 0, 8.7, -5);
-    this.box(m.trim, 9.8, 0.35, 20.2, 0, 9.9, -5);
-    this.box(m.roof, 10, 0.45, 20.5, 0, 10.15, -5);
-    this.railRect(-5, 5, 2.5, 4.5, 7.0);
+    if (decks === 2) {
+      // Upper deck floor + set-back saloon (widened for a roomier lounge).
+      this.box(m.deck, beam * 0.815, 0.3, hullLen * 0.65, 0, 6.85, -4 * L);
+      this.box(m.cabin, beam * 0.73, 2.8, hullLen * 0.5, 0, 8.4, -5 * L);
+      this.box(m.glass, beam * 0.745, 1.3, hullLen * 0.45, 0, 8.7, -5 * L);
+      this.box(m.trim, beam * 0.755, 0.35, hullLen * 0.505, 0, 9.9, -5 * L);
+      this.box(m.roof, beam * 0.77, 0.45, hullLen * 0.5125, 0, 10.15, -5 * L);
+      this.railRect(-beam * 0.385, beam * 0.385, 2.5 * L, 4.5 * L, 7.0);
+    }
 
-    // Wheelhouse — the forward "driving" capital section.
-    this.box(m.cabin, 6.5, 3.0, 6, 0, 8.5, 14.5);
-    this.box(m.glass, 6.7, 1.6, 6.1, 0, 8.9, 14.6);
-    this.box(m.trim, 6.7, 0.35, 6.2, 0, 10.1, 14.5);
-    this.box(m.roof, 6.8, 0.4, 6.3, 0, 10.35, 14.5);
+    // Wheelhouse — the "driving" capital section.
+    const wh = this.wheelhouseCenter();
+    this.box(m.cabin, beam * 0.5, 3.0, 6 * L, 0, wh.y, wh.z);
+    this.box(m.glass, beam * 0.515, 1.6, 6.1 * L, 0, wh.y + 0.4, wh.z + 0.1 * L);
+    this.box(m.trim, beam * 0.515, 0.35, 6.2 * L, 0, wh.y + 1.6, wh.z);
+    this.box(m.roof, beam * 0.523, 0.4, 6.3 * L, 0, wh.y + 1.85, wh.z);
     // Helm console + mast hint the driving station.
-    this.box(m.boot, 2.4, 0.8, 0.8, 0, 7.6, 16.4);
-    this.box(m.rail, 0.2, 4, 0.2, 0, 12.5, 12);
+    this.box(m.boot, 2.4 * B, 0.8, 0.8 * L, 0, wh.y - 0.9, wh.z + 1.9 * L);
+    this.box(m.rail, 0.2, 4, 0.2, 0, wh.y + 4, wh.z - 2.5 * L);
 
-    // Aft funnel.
-    this.box(m.funnel, 2.2, 3.2, 2.2, 0, 8.4, -13);
-    this.box(m.boot, 2.4, 0.4, 2.4, 0, 10.0, -13);
+    // Funnel — only the larger ocean-going classes (e.g. Freshwater) have one.
+    if (hasFunnel) {
+      this.box(m.funnel, 2.2 * B, 3.2, 2.2 * B, 0, 8.4, -13 * L);
+      this.box(m.boot, 2.4 * B, 0.4, 2.4 * B, 0, 10.0, -13 * L);
+    }
 
     this.furnish();
   }
 
   /** Seats, bar, captain's pit and open-air benches that dress each deck. */
   private furnish(): void {
+    const { decks, scale } = this.spec;
+    const L = scale.length;
+    const B = scale.beam;
+
     // Lower saloon: forward-facing seat rows either side of a central aisle.
     for (const z of [7, 3, -1, -5]) {
-      this.chair(-5.0, 2.15, z, -1);
-      this.chair(-3.6, 2.15, z, -1);
-      this.chair(3.6, 2.15, z, -1);
-      this.chair(5.0, 2.15, z, -1);
+      this.chair(-5.0 * B, 2.15, z * L, -1);
+      this.chair(-3.6 * B, 2.15, z * L, -1);
+      this.chair(3.6 * B, 2.15, z * L, -1);
+      this.chair(5.0 * B, 2.15, z * L, -1);
     }
     // Lower saloon bar with stools, against the aft bulkhead.
-    this.bar(0, 2.15, -12);
+    this.bar(0, 2.15, -12 * L);
 
-    // Upper saloon: a lounge of seats plus a small refreshment kiosk aft.
-    for (const z of [1, -3, -7]) {
-      this.chair(-3.8, 7.0, z, -1);
-      this.chair(3.8, 7.0, z, -1);
+    if (decks === 2) {
+      // Upper saloon: a lounge of seats plus a small refreshment kiosk aft.
+      for (const z of [1, -3, -7]) {
+        this.chair(-3.8 * B, 7.0, z * L, -1);
+        this.chair(3.8 * B, 7.0, z * L, -1);
+      }
+      this.bar(0, 7.0, -12 * L, 0.7);
     }
-    this.bar(0, 7.0, -12, 0.7);
 
-    // Captain's pit in the forward wheelhouse.
+    // Captain's pit in the wheelhouse.
     this.captainPit();
 
     // Open-air benches on the bow and stern decks.
-    this.bench(-3.2, 2.3, 15.5);
-    this.bench(3.2, 2.3, 15.5);
-    this.bench(-3.2, 2.3, -15);
-    this.bench(3.2, 2.3, -15);
+    this.bench(-3.2 * B, 2.3, 15.5 * L);
+    this.bench(3.2 * B, 2.3, 15.5 * L);
+    this.bench(-3.2 * B, 2.3, -15 * L);
+    this.bench(3.2 * B, 2.3, -15 * L);
   }
 
   /** A single voxel seat; dir = -1 backrest aft, +1 backrest forward. */
@@ -382,16 +471,21 @@ export class VoxelFerry {
     this.box(f, 0.12, 0.5, 0.12, x + 1.3, y + 0.25, z);
   }
 
-  /** The captain's driving pit: console, wheel and seat in the wheelhouse. */
+  /** The captain's driving pit: console, wheel and seat in the wheelhouse.
+   * Faces the bow, whether the wheelhouse sits forward or amidships. */
   private captainPit(): void {
-    const y = 7.0;
-    this.box(this.mat.boot, 3.4, 1.0, 1.0, 0, y + 0.5, 15.8);
-    this.box(this.mat.glass, 3.2, 0.5, 0.25, 0, y + 1.15, 15.4);
+    const { wheelhouse, scale } = this.spec;
+    const L = scale.length;
+    const wh = this.wheelhouseCenter();
+    const y = wh.y - 1.5;
+    const dir: 1 | -1 = wheelhouse === 'forward' ? 1 : -1;
+    this.box(this.mat.boot, 3.4, 1.0, 1.0, 0, y + 0.5, wh.z + dir * 1.3 * L);
+    this.box(this.mat.glass, 3.2, 0.5, 0.25, 0, y + 1.15, wh.z + dir * 0.9 * L);
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.09, 8, 20), this.mat.frame);
-    wheel.position.set(0, y + 1.15, 15.1);
+    wheel.position.set(0, y + 1.15, wh.z + dir * 0.6 * L);
     wheel.castShadow = true;
     this.group.add(wheel);
-    this.chair(0, y, 13.9, -1);
+    this.chair(0, y, wh.z - dir * 1.1 * L, dir === 1 ? -1 : 1);
   }
 
   /** A simple voxel railing around a rectangular open deck at height `y`. */
