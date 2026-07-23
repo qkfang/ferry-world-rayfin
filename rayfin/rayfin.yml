@@ -1,5 +1,5 @@
-id: test-app
-name: Test_App
+id: ferry-world-rayfin
+name: ferry-world-rayfin
 version: 1.0.0
 services:
   auth:
@@ -11,6 +11,7 @@ services:
     allowedRedirectUris:
       - http://localhost:5173
       - https://broad-inlet-39886f4465-australiaeast.webapp.fabricapps.net
+      - https://fond-ridge-a88d7862bf-australiaeast.webapp.fabricapps.net
   data:
     enabled: true
     dialect: mssql

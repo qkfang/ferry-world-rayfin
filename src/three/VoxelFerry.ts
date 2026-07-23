@@ -156,6 +156,23 @@ const DECK_NAME: Record<DeckId, string> = {
   bridge: 'Wheelhouse',
 };
 
+/** A uniformed crew member shown when a staff figure is clicked. */
+export interface StaffCard {
+  role: string;
+  name: string;
+  station: string;
+  duty: string;
+}
+
+/** Optional overrides that turn a plain figure into a uniformed crew member. */
+interface FigureStyle {
+  shirt: number;
+  trousers: number;
+  cap?: number;
+  vest?: number;
+  apron?: number;
+}
+
 const pick = <T>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 
 function makeTicket(deck: DeckId): PassengerTicket {
@@ -192,6 +209,7 @@ export class VoxelFerry {
   private readonly deckAreas: Partial<Record<DeckId, DeckArea>>;
   private readonly passengers: Passenger[] = [];
   private readonly perDeck = new Map<DeckId, Passenger[]>();
+  private readonly crew: THREE.Group[] = [];
 
   // Enclosing surfaces (hull, cabin walls, glazing, roof) are rendered as a
   // translucent "cutaway" shell so the decks and passengers inside stay
@@ -251,6 +269,7 @@ export class VoxelFerry {
       wood: new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.7 }),
     };
     this.buildFerry();
+    this.buildCrew();
     for (const d of Object.keys(this.deckAreas) as DeckId[]) this.perDeck.set(d, []);
   }
 
@@ -295,15 +314,20 @@ export class VoxelFerry {
     for (const mat of Object.values(this.mat)) mat.dispose();
   }
 
-  /** Walk up from a raycast-hit object to the passenger it belongs to. */
-  ticketFor(obj: THREE.Object3D | null): PassengerTicket | null {
+  /** Walk up from a raycast-hit object to the passenger group it belongs to. */
+  passengerFor(obj: THREE.Object3D | null): THREE.Object3D | null {
     let o: THREE.Object3D | null = obj;
     while (o) {
-      const t = o.userData?.ticket as PassengerTicket | undefined;
-      if (t) return t;
+      if (o.userData?.ticket || o.userData?.staff) return o;
       o = o.parent;
     }
     return null;
+  }
+
+  /** Walk up from a raycast-hit object to the passenger it belongs to. */
+  ticketFor(obj: THREE.Object3D | null): PassengerTicket | null {
+    const p = this.passengerFor(obj);
+    return p ? (p.userData.ticket as PassengerTicket) : null;
   }
 
   // --- Ferry hull + superstructure -------------------------------------------
@@ -508,16 +532,19 @@ export class VoxelFerry {
 
   // --- Voxel passengers ------------------------------------------------------
 
-  private buildFigure(): { group: THREE.Group; legL: THREE.Mesh; legR: THREE.Mesh } {
+  private buildFigure(style?: FigureStyle): { group: THREE.Group; legL: THREE.Mesh; legR: THREE.Mesh } {
     const p = PALETTES[Math.floor(Math.random() * PALETTES.length)];
     const g = new THREE.Group();
     const skin = new THREE.MeshStandardMaterial({ color: p.skin, roughness: 0.8 });
-    const shirt = new THREE.MeshStandardMaterial({ color: p.shirt, roughness: 0.8 });
-    const trousers = new THREE.MeshStandardMaterial({ color: p.trousers, roughness: 0.8 });
+    const shirt = new THREE.MeshStandardMaterial({ color: style?.shirt ?? p.shirt, roughness: 0.8 });
+    const trousers = new THREE.MeshStandardMaterial({
+      color: style?.trousers ?? p.trousers,
+      roughness: 0.8,
+    });
 
-    const part = (mat: THREE.Material, w: number, h: number, d: number, x: number, y: number) => {
+    const part = (mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z = 0) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      mesh.position.set(x, y, 0);
+      mesh.position.set(x, y, z);
       mesh.castShadow = true;
       g.add(mesh);
       return mesh;
@@ -542,8 +569,81 @@ export class VoxelFerry {
     part(skin, 0.16, 0.5, 0.16, 0.4, 1.05);
     part(skin, 0.42, 0.42, 0.42, 0, 1.65); // head
 
+    // Uniform extras that make each crew role recognisable.
+    if (style?.vest !== undefined) {
+      const vest = new THREE.MeshStandardMaterial({ color: style.vest, roughness: 0.6 });
+      part(vest, 0.68, 0.6, 0.42, 0, 1.05); // hi-vis vest over the torso
+    }
+    if (style?.apron !== undefined) {
+      const apron = new THREE.MeshStandardMaterial({ color: style.apron, roughness: 0.7 });
+      part(apron, 0.5, 0.6, 0.42, 0, 0.85); // bar apron across the front
+    }
+    if (style?.cap !== undefined) {
+      const cap = new THREE.MeshStandardMaterial({ color: style.cap, roughness: 0.6 });
+      part(cap, 0.46, 0.16, 0.46, 0, 1.92); // crown
+      part(cap, 0.5, 0.06, 0.22, 0, 1.86, 0.28); // peak
+    }
+
     g.scale.setScalar(1.0);
     return { group: g, legL, legR };
+  }
+
+  /** Uniformed crew posted at their stations: captain, bar staff, deckhands. */
+  private buildCrew(): void {
+    const post = (
+      style: FigureStyle,
+      x: number,
+      y: number,
+      z: number,
+      ry: number,
+      card: StaffCard,
+    ) => {
+      const { group } = this.buildFigure(style);
+      group.position.set(x, y, z);
+      group.rotation.y = ry;
+      group.userData.staff = card;
+      this.crew.push(group);
+      this.group.add(group);
+    };
+
+    const NAVY = 0x16294d;
+    const DARK = 0x24272c;
+
+    // Captain at the wheelhouse helm — navy uniform + white peaked cap.
+    post({ shirt: NAVY, trousers: NAVY, cap: 0xf3f4f6 }, 1.4, 7.0, 14.2, 0, {
+      role: 'Captain',
+      name: pick(NAMES),
+      station: 'Wheelhouse',
+      duty: 'Driving the vessel',
+    });
+
+    // Bar attendants — white shirt + burgundy apron — behind each bar.
+    post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 2.15, -12.8, 0, {
+      role: 'Bar attendant',
+      name: pick(NAMES),
+      station: 'Lower saloon bar',
+      duty: 'Serving drinks',
+    });
+    post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 7.0, -12.8, 0, {
+      role: 'Bar attendant',
+      name: pick(NAMES),
+      station: 'Upper deck kiosk',
+      duty: 'Serving drinks',
+    });
+
+    // Deckhands — navy uniform + hi-vis vest — supporting on the open decks.
+    post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 0, 2.15, 15, Math.PI, {
+      role: 'Deckhand',
+      name: pick(NAMES),
+      station: 'Bow deck',
+      duty: 'Assisting passengers',
+    });
+    post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 3.8, 7.0, 0, -Math.PI / 2, {
+      role: 'Deckhand',
+      name: pick(NAMES),
+      station: 'Upper deck',
+      duty: 'Assisting passengers',
+    });
   }
 
   private spawnPassenger(area: DeckArea, list: Passenger[]): void {
