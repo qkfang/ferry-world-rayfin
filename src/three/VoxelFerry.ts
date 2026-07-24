@@ -221,7 +221,23 @@ export class VoxelFerry {
   // funnel) stay opaque so the vessel still reads as solid. Colours come from
   // the ferry's livery spec so each real vessel matches its own reference photo.
   private readonly mat: Record<
-    'hull' | 'boot' | 'cabin' | 'deck' | 'glass' | 'trim' | 'roof' | 'rail' | 'funnel' | 'seat' | 'frame' | 'wood',
+    | 'hull'
+    | 'boot'
+    | 'cabin'
+    | 'deck'
+    | 'glass'
+    | 'trim'
+    | 'roof'
+    | 'rail'
+    | 'funnel'
+    | 'seat'
+    | 'frame'
+    | 'wood'
+    | 'sheer'
+    | 'mullion'
+    | 'chrome'
+    | 'goldGlass'
+    | 'sign',
     THREE.MeshStandardMaterial
   >;
 
@@ -232,9 +248,9 @@ export class VoxelFerry {
     this.mat = {
       hull: new THREE.MeshStandardMaterial({
         color: livery.hull,
-        roughness: 0.6,
+        roughness: 0.55,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.5,
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
@@ -271,6 +287,27 @@ export class VoxelFerry {
       seat: new THREE.MeshStandardMaterial({ color: 0xb23a3a, roughness: 0.75 }),
       frame: new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 0.5, metalness: 0.4 }),
       wood: new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.7 }),
+      // Opaque exterior detailing that gives the vessel its real silhouette:
+      // the yellow bulwark/superstructure, window mullions, mast/radar metal,
+      // the gold wheelhouse windscreen and the lit destination sign.
+      sheer: new THREE.MeshStandardMaterial({ color: livery.cabin, roughness: 0.55 }),
+      mullion: new THREE.MeshStandardMaterial({ color: 0x21262a, roughness: 0.5, metalness: 0.3 }),
+      chrome: new THREE.MeshStandardMaterial({ color: 0xdfe4e7, roughness: 0.35, metalness: 0.55 }),
+      goldGlass: new THREE.MeshStandardMaterial({
+        color: 0xc9a53c,
+        roughness: 0.12,
+        metalness: 0.85,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+      sign: new THREE.MeshStandardMaterial({
+        color: 0x12161b,
+        emissive: 0xffb020,
+        emissiveIntensity: 0.5,
+        roughness: 0.4,
+      }),
     };
     this.buildFerry();
     this.buildCrew();
@@ -365,65 +402,179 @@ export class VoxelFerry {
     const beam = 13 * B;
     const hullLen = 40 * L;
     const bowZ = 21.5 * L;
-    const bowLen = 5 * L;
+    const hullFront = hullLen / 2;
 
-    // Hull + waterline boot-top. Catamarans get twin pontoons either side of
-    // the centreline gap; a monohull (e.g. Freshwater class) gets one hull.
+    // Hull: deep-green topsides over a near-black boot-top, ending in a raked,
+    // pointed cutwater bow. Catamarans get twin pontoons; a monohull (e.g.
+    // Freshwater class) gets a single hull.
+    const bow = (w: number, x: number) =>
+      this.prismX(m.hull, w, x, [
+        [hullFront - 1, -0.4],
+        [hullFront - 1, 2.0],
+        [bowZ + 2, 2.0],
+      ]);
     if (hullType === 'catamaran') {
       const pontoonW = beam * 0.36;
       const half = (pontoonW + beam * 0.1) / 2;
       for (const side of [-1, 1] as const) {
         const x = side * half;
         this.box(m.hull, pontoonW, 2.4, hullLen, x, 0.8, 0);
-        this.box(m.boot, pontoonW + 0.2, 0.6, hullLen + 0.2, x, -0.4, 0);
-        this.box(m.hull, pontoonW * 0.85, 2.2, bowLen, x, 0.9, bowZ);
+        this.box(m.boot, pontoonW + 0.2, 0.7, hullLen + 0.2, x, -0.35, 0);
+        bow(pontoonW, x);
       }
     } else {
       this.box(m.hull, beam, 2.4, hullLen, 0, 0.8, 0);
-      this.box(m.boot, beam + 0.2, 0.6, hullLen + 0.2, 0, -0.4, 0);
-      this.box(m.hull, beam * 0.62, 2.2, bowLen, 0, 0.9, bowZ);
+      this.box(m.boot, beam + 0.2, 0.7, hullLen + 0.2, 0, -0.35, 0);
+      bow(beam * 0.85, 0);
     }
 
-    // Lower deck floor (widened for more usable saloon space).
+    // Bright rubbing strake along the green/yellow join, and draft marks aft.
+    for (const side of [-1, 1] as const)
+      this.box(m.trim, 0.3, 0.28, hullLen, side * beam * 0.5, 1.7, 0);
+
+    // Main deck floor + a low yellow bulwark ringing the open fore/aft decks.
     this.box(m.deck, beam * 0.97, 0.3, hullLen * 0.9, 0, 2.0, -1 * L);
+    for (const side of [-1, 1] as const)
+      this.box(m.sheer, 0.5, 1.1, hullLen * 0.92, side * beam * 0.475, 2.55, -1 * L);
+    this.box(m.sheer, beam * 0.95, 1.1, 0.6, 0, 2.55, 18.4 * L);
+    this.box(m.sheer, beam * 0.95, 1.1, 0.6, 0, 2.55, -19.4 * L);
 
-    // Lower saloon (enclosed cabin) with a dark glazing band + roof.
-    this.box(m.cabin, beam * 0.885, 3.4, hullLen * 0.75, 0, 3.9, -2 * L);
-    this.box(m.glass, beam * 0.9, 1.5, hullLen * 0.7, 0, 4.3, -2 * L);
-    this.box(m.trim, beam * 0.91, 0.4, hullLen * 0.755, 0, 5.7, -2 * L);
-    this.box(m.roof, beam * 0.925, 0.5, hullLen * 0.7625, 0, 6.0, -2 * L);
-
-    // Open lower fore/aft decks get simple perimeter rails.
-    this.railRect(-beam * 0.46, beam * 0.46, 13 * L, 17.5 * L, 2.3);
-    this.railRect(-beam * 0.46, beam * 0.46, -17 * L, -12 * L, 2.3);
+    // Lower saloon: yellow body, black wraparound glazing with mullions,
+    // green roof — plus the signature forward-raked black window wall.
+    this.saloon(beam * 0.885, 3.4, hullLen * 0.75, -2 * L, 2.15);
+    const fZ = -2 * L + (hullLen * 0.75) / 2;
+    this.prismX(m.glass, beam * 0.82, 0, [
+      [fZ - 2 * L, 2.7],
+      [fZ + 2 * L, 5.7],
+      [fZ - 2 * L, 5.7],
+    ]);
 
     if (decks === 2) {
-      // Upper deck floor + set-back saloon (widened for a roomier lounge).
-      this.box(m.deck, beam * 0.815, 0.3, hullLen * 0.65, 0, 6.85, -4 * L);
-      this.box(m.cabin, beam * 0.73, 2.8, hullLen * 0.5, 0, 8.4, -5 * L);
-      this.box(m.glass, beam * 0.745, 1.3, hullLen * 0.45, 0, 8.7, -5 * L);
-      this.box(m.trim, beam * 0.755, 0.35, hullLen * 0.505, 0, 9.9, -5 * L);
-      this.box(m.roof, beam * 0.77, 0.45, hullLen * 0.5125, 0, 10.15, -5 * L);
+      this.saloon(beam * 0.73, 2.8, hullLen * 0.5, -5 * L, 7.0);
       this.railRect(-beam * 0.385, beam * 0.385, 2.5 * L, 4.5 * L, 7.0);
     }
 
-    // Wheelhouse — the "driving" capital section.
-    const wh = this.wheelhouseCenter();
-    this.box(m.cabin, beam * 0.5, 3.0, 6 * L, 0, wh.y, wh.z);
-    this.box(m.glass, beam * 0.515, 1.6, 6.1 * L, 0, wh.y + 0.4, wh.z + 0.1 * L);
-    this.box(m.trim, beam * 0.515, 0.35, 6.2 * L, 0, wh.y + 1.6, wh.z);
-    this.box(m.roof, beam * 0.523, 0.4, 6.3 * L, 0, wh.y + 1.85, wh.z);
-    // Helm console + mast hint the driving station.
-    this.box(m.boot, 2.4 * B, 0.8, 0.8 * L, 0, wh.y - 0.9, wh.z + 1.9 * L);
-    this.box(m.rail, 0.2, 4, 0.2, 0, wh.y + 4, wh.z - 2.5 * L);
+    // Forward wheelhouse with a gold raked windscreen, plus the mast, radar,
+    // flags, life rings and a lit destination sign.
+    this.buildWheelhouse();
+    this.buildMast();
+    this.lifeRing(beam * 0.46, 3.7, 6 * L);
+    this.lifeRing(-beam * 0.46, 3.7, 6 * L);
 
     // Funnel — only the larger ocean-going classes (e.g. Freshwater) have one.
     if (hasFunnel) {
-      this.box(m.funnel, 2.2 * B, 3.2, 2.2 * B, 0, 8.4, -13 * L);
-      this.box(m.boot, 2.4 * B, 0.4, 2.4 * B, 0, 10.0, -13 * L);
+      this.box(m.funnel, 2.2 * B, 3.4, 2.4 * B, 0, 8.6, -13 * L);
+      this.box(m.boot, 2.5 * B, 0.5, 2.6 * B, 0, 10.4, -13 * L);
     }
 
     this.furnish();
+  }
+
+  /** One enclosed saloon: a translucent cutaway shell (so the passengers stay
+   * visible) dressed with opaque yellow sill/header bands, a dark wraparound
+   * glazing band with vertical mullions, and a green roof with a drip edge. */
+  private saloon(w: number, h: number, len: number, z: number, baseY: number): void {
+    const m = this.mat;
+    const glassH = h * 0.5;
+    const glassY = baseY + h * 0.56;
+    this.box(m.cabin, w, h, len, 0, baseY + h / 2, z);
+    this.box(m.glass, w + 0.06, glassH, len * 0.99, 0, glassY, z);
+    this.box(m.sheer, w + 0.04, h * 0.22, len, 0, baseY + h * 0.16, z);
+    this.box(m.sheer, w + 0.04, h * 0.16, len, 0, baseY + h * 0.9, z);
+    this.box(m.roof, w * 1.03, 0.5, len * 1.03, 0, baseY + h + 0.25, z);
+    this.box(m.trim, w * 1.05, 0.14, len * 1.05, 0, baseY + h, z);
+    this.glazingMullions(w / 2 + 0.05, glassY, glassH, z, len * 0.99);
+  }
+
+  /** Evenly spaced vertical window mullions down both sides of a glazing band. */
+  private glazingMullions(halfW: number, y: number, h: number, z: number, len: number): void {
+    const n = Math.max(4, Math.round(len / 2.4));
+    for (let i = 0; i <= n; i++) {
+      const zz = z - len / 2 + (len * i) / n;
+      for (const s of [-1, 1] as const) this.box(this.mat.mullion, 0.16, h, 0.16, s * halfW, y, zz);
+    }
+  }
+
+  /** Raised forward wheelhouse: yellow block, gold forward-raked windscreen,
+   * side glazing and a green roof with a small overhang. */
+  private buildWheelhouse(): void {
+    const m = this.mat;
+    const B = this.spec.scale.beam;
+    const L = this.spec.scale.length;
+    const beam = 13 * B;
+    const wh = this.wheelhouseCenter();
+    const w = beam * 0.52;
+    this.box(m.sheer, w, 2.6, 6 * L, 0, wh.y, wh.z);
+    this.box(m.glass, w + 0.05, 1.3, 6.05 * L, 0, wh.y + 0.5, wh.z);
+    this.prismX(m.goldGlass, w, 0, [
+      [wh.z + 1.2 * L, wh.y - 0.6],
+      [wh.z + 3 * L, wh.y + 1.2],
+      [wh.z + 1.2 * L, wh.y + 1.2],
+    ]);
+    this.box(m.roof, w * 1.08, 0.4, 6.4 * L, 0, wh.y + 1.6, wh.z);
+    this.box(m.trim, w * 1.1, 0.12, 6.5 * L, 0, wh.y + 1.4, wh.z);
+    this.box(m.mullion, 2.4 * B, 0.8, 0.8 * L, 0, wh.y - 0.9, wh.z + 1.9 * L);
+  }
+
+  /** Signal mast above the wheelhouse: pole and yardarm, a white radar dome,
+   * searchlight, antenna whip, a halyard of flags and a lit destination sign. */
+  private buildMast(): void {
+    const m = this.mat;
+    const L = this.spec.scale.length;
+    const wh = this.wheelhouseCenter();
+    const baseY = wh.y + 1.8;
+    const z = wh.z - 1.5 * L;
+    this.box(m.sheer, 0.3, 5.5, 0.3, 0, baseY + 2.75, z);
+    this.box(m.sheer, 4.2, 0.22, 0.22, 0, baseY + 3.4, z);
+    const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.5, 16), m.chrome);
+    dome.position.set(0, baseY + 1.4, z + 0.4);
+    dome.castShadow = true;
+    this.group.add(dome);
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      m.chrome,
+    );
+    cap.position.set(0, baseY + 1.65, z + 0.4);
+    this.group.add(cap);
+    this.box(m.chrome, 0.5, 0.5, 0.5, 1.4, baseY + 1.4, z + 0.4);
+    this.box(m.chrome, 0.06, 3.2, 0.06, 0, baseY + 5.9, z);
+    this.box(m.seat, 1.1, 0.7, 0.08, 0.9, baseY + 4.6, z);
+    this.box(m.rail, 1.1, 0.7, 0.08, 0.9, baseY + 3.9, z);
+    this.box(m.trim, 1.1, 0.7, 0.08, 0.9, baseY + 3.2, z);
+    this.box(m.sign, 3.6, 0.7, 0.3, 0, 6.15, -2 * L + (13 * L));
+  }
+
+  /** A red-and-white life ring hung flat against the saloon side. */
+  private lifeRing(x: number, y: number, z: number): void {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.16, 8, 18), this.mat.seat);
+    ring.position.set(x, y, z);
+    ring.rotation.y = Math.PI / 2;
+    ring.castShadow = true;
+    this.group.add(ring);
+  }
+
+  /** A triangular prism (raked bow, sloped window walls, gold windscreen).
+   * `pts` are three `[z, y]` corners; the prism is extruded width `w` along X. */
+  private prismX(mat: THREE.Material, w: number, x: number, pts: [number, number][]): THREE.Mesh {
+    const [a, b, c] = pts;
+    const hw = w / 2;
+    const v = new Float32Array([
+      x - hw, a[1], a[0],
+      x - hw, b[1], b[0],
+      x - hw, c[1], c[0],
+      x + hw, a[1], a[0],
+      x + hw, b[1], b[0],
+      x + hw, c[1], c[0],
+    ]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+    geo.setIndex([0, 2, 1, 3, 4, 5, 0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 2, 0, 3, 2, 3, 5]);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = !(mat as THREE.Material).transparent;
+    mesh.receiveShadow = true;
+    this.group.add(mesh);
+    return mesh;
   }
 
   /** Seats, bar, captain's pit and open-air benches that dress each deck. */
