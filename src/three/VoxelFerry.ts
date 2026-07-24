@@ -450,6 +450,9 @@ export class VoxelFerry {
     ]);
 
     if (decks === 2) {
+      // Upper deck floor bridges down onto the lower saloon roof so the two
+      // decks read as one connected structure instead of a floating upper box.
+      this.box(m.deck, beam * 0.83, 1.0, hullLen * 0.62, 0, 6.5, -4 * L);
       this.saloon(beam * 0.73, 2.8, hullLen * 0.5, -5 * L, 7.0);
       this.railRect(-beam * 0.385, beam * 0.385, 2.5 * L, 4.5 * L, 7.0);
     }
@@ -479,11 +482,24 @@ export class VoxelFerry {
     const glassY = baseY + h * 0.56;
     this.box(m.cabin, w, h, len, 0, baseY + h / 2, z);
     this.box(m.glass, w + 0.06, glassH, len * 0.99, 0, glassY, z);
-    this.box(m.sheer, w + 0.04, h * 0.22, len, 0, baseY + h * 0.16, z);
-    this.box(m.sheer, w + 0.04, h * 0.16, len, 0, baseY + h * 0.9, z);
+    // Sill and header are thin perimeter frames (not solid slabs) so the seats
+    // and moving passengers inside stay visible from outside.
+    this.wallBand(w + 0.04, h * 0.22, len, baseY + h * 0.16, z);
+    this.wallBand(w + 0.04, h * 0.16, len, baseY + h * 0.9, z);
     this.box(m.roof, w * 1.03, 0.5, len * 1.03, 0, baseY + h + 0.25, z);
     this.box(m.trim, w * 1.05, 0.14, len * 1.05, 0, baseY + h, z);
     this.glazingMullions(w / 2 + 0.05, glassY, glassH, z, len * 0.99);
+  }
+
+  /** A thin opaque perimeter band (four walls) around a deck, leaving the
+   * interior open so seats and passengers stay visible from outside. */
+  private wallBand(w: number, h: number, len: number, y: number, z: number): void {
+    const m = this.mat.sheer;
+    const t = 0.22;
+    this.box(m, t, h, len, -w / 2, y, z);
+    this.box(m, t, h, len, w / 2, y, z);
+    this.box(m, w, h, t, 0, y, z - len / 2);
+    this.box(m, w, h, t, 0, y, z + len / 2);
   }
 
   /** Evenly spaced vertical window mullions down both sides of a glazing band. */

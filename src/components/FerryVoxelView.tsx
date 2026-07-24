@@ -137,7 +137,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       // Nudge the framed vessel slightly up and to the left on screen.
-      camera.setViewOffset(w, h, w * 0.1, h * 0.08, w, h);
+      camera.setViewOffset(w, h, w * 0.02, h * 0.08, w, h);
       camera.updateProjectionMatrix();
     };
     resize();
