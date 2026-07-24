@@ -10,6 +10,7 @@ export function HomePage() {
   const { signOut } = useAuth();
   const cesium = useRef<CesiumHandle>(null);
   const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState<CesiumStatus>({
     count: 0,
     asOf: null,
@@ -18,6 +19,20 @@ export function HomePage() {
   });
 
   const updated = status.asOf ? new Date(status.asOf).toLocaleTimeString() : null;
+
+  // Standalone only: the Fabric portal brokers the token silently, so this
+  // button never appears there. In a plain browser tab it triggers a one-time
+  // interactive sign-in; once it resolves the next poll picks up the token.
+  const connectLiveData = async () => {
+    setConnecting(true);
+    try {
+      await connectDataInteractive();
+    } catch {
+      // Failure is reflected by the poll (button stays visible).
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a1826]">
@@ -44,10 +59,11 @@ export function HomePage() {
           </span>
           {status.needsAuth && (
             <button
-              onClick={() => void connectDataInteractive()}
-              className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow ring-1 ring-emerald-400/40 transition-colors hover:bg-emerald-500"
+              onClick={() => void connectLiveData()}
+              disabled={connecting}
+              className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow ring-1 ring-emerald-400/40 transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Connect live data
+              {connecting ? 'Connecting…' : 'Connect live data'}
             </button>
           )}
           <button

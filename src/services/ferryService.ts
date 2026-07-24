@@ -1,8 +1,21 @@
+import { isEmbeddedMode } from '@microsoft/fabric-embedded-host';
+
 import type { FerryFeed, FerryScheduleFeed, ReferenceFeed } from '@/shared/contract';
 
 import { colIndex, isDirectKustoConfigured, queryKusto } from './kustoClient';
+import { getRayfinClient } from './rayfinClient';
 
 const API_BASE = import.meta.env.VITE_FERRY_API ?? '/api';
+
+/**
+ * True when the app is running inside the Fabric portal iframe. In that case we
+ * read the ferry data through the Rayfin backend (GraphQL, using the session
+ * the portal already established) instead of calling the Eventhouse directly —
+ * no MSAL token and no extra sign-in are needed.
+ */
+function isFabricEmbedded(): boolean {
+  return isEmbeddedMode({});
+}
 
 /** True when served from the Vite dev server (the `/api` middleware exists). */
 function isLocalFrontend(): boolean {
@@ -74,10 +87,57 @@ async function fetchReferenceDirect(signal?: AbortSignal): Promise<ReferenceFeed
   return { locations };
 }
 
+// --- Rayfin-native query layer (Fabric portal) ------------------------------
+
+// Read the current-state snapshot tables through the Rayfin GraphQL client. The
+// session is the one the Fabric portal already brokered, so no MSAL token or
+// extra login is required. Rows are kept in sync with the Eventhouse upstream.
+async function fetchFerriesRayfin(): Promise<FerryFeed> {
+  const rows = await getRayfinClient()
+    .data.Ferry.select(['ferry_name', 'ferry_lat', 'ferry_long', 'ferry_destination', 'timestamp'])
+    .orderBy({ timestamp: 'desc' })
+    .execute();
+  // DAB has no group-by / arg_max, so dedupe client-side. Rows come newest
+  // first, so the first time a ferry_name is seen is its latest record.
+  const latest = new Map<string, FerryFeed['ferries'][number]>();
+  for (const r of rows) {
+    const name = String(r.ferry_name);
+    if (latest.has(name)) continue;
+    const lat = Number(r.ferry_lat);
+    const lon = Number(r.ferry_long);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    latest.set(name, {
+      id: name,
+      name,
+      lat,
+      lon,
+      destination: r.ferry_destination ?? '',
+      ts: new Date(r.timestamp as unknown as string).getTime(),
+    });
+  }
+  return { asOf: new Date().toISOString(), ferries: [...latest.values()] };
+}
+
+async function fetchReferenceRayfin(): Promise<ReferenceFeed> {
+  const rows = await getRayfinClient()
+    .data.ReferenceLocation.select(['id', 'name', 'lat', 'lon'])
+    .execute();
+  const locations = rows
+    .map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      lat: Number(r.lat),
+      lon: Number(r.lon),
+    }))
+    .filter((l) => Number.isFinite(l.lat) && Number.isFinite(l.lon));
+  return { locations };
+}
+
 // --- Public API -------------------------------------------------------------
 
 /** Fetch the latest ferry positions. */
 export async function fetchFerries(signal?: AbortSignal): Promise<FerryFeed> {
+  if (isFabricEmbedded()) return fetchFerriesRayfin();
   if (useDirectKusto) return fetchFerriesDirect(signal);
   const res = await fetch(`${API_BASE}/ferries/live`, { signal });
   if (!res.ok) throw new Error(`ferries/live failed: ${res.status} ${res.statusText}`);
@@ -87,6 +147,7 @@ export async function fetchFerries(signal?: AbortSignal): Promise<FerryFeed> {
 /** Fetch wharves / landmarks used to dress the scene (called once at startup). */
 export async function fetchReferenceLocations(signal?: AbortSignal): Promise<ReferenceFeed> {
   try {
+    if (isFabricEmbedded()) return await fetchReferenceRayfin();
     if (useDirectKusto) return await fetchReferenceDirect(signal);
     const res = await fetch(`${API_BASE}/reference-locations`, { signal });
     if (!res.ok) throw new Error(String(res.status));
@@ -109,7 +170,7 @@ export async function fetchFerrySchedule(
   opts: { upcoming?: boolean; limit?: number } = {},
   signal?: AbortSignal,
 ): Promise<FerryScheduleFeed> {
-  if (useDirectKusto) {
+  if (isFabricEmbedded() || useDirectKusto) {
     const today = new Date().toISOString().slice(0, 10);
     return { date: today, asOf: new Date().toISOString(), count: 0, departures: [] };
   }

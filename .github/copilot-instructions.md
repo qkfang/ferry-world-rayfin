@@ -8,6 +8,11 @@
 - make sure remove any sensitive information in mock data
 - any sample or mock telemetry data must follow open telemetry schema
 
+rayfin app docs:
+
+https://learn.microsoft.com/en-us/fabric/apps/overview#key-features
+
+
 
 This is a fabric rayfin project, rayfin configuration is below
 the service account (sp-demo-01) has access to deploy fabric resources, and the project is deployed to fabric with the following details. 

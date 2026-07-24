@@ -1,3 +1,9 @@
-export type BlankAppSchema = Record<string, never>;
+import { Ferry } from './Ferry.js';
+import { ReferenceLocation } from './ReferenceLocation.js';
 
-export const schema = [];
+export type AppSchema = {
+  Ferry: Ferry;
+  ReferenceLocation: ReferenceLocation;
+};
+
+export const schema = [Ferry, ReferenceLocation];

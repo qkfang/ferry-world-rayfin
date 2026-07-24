@@ -23,6 +23,7 @@
   "dependencies": {
     "@azure/msal-browser": "^5.16.0",
     "@babylonjs/core": "^9.15.0",
+    "@microsoft/fabric-embedded-host": "^1.33.2",
     "@microsoft/rayfin-auth-provider-fabric": "^1.33.2",
     "@microsoft/rayfin-client": "^1.33.2",
     "@microsoft/rayfin-core": "^1.33.2",

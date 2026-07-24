@@ -3,10 +3,17 @@
  *
  * In production there is no Vite `/api` middleware, so the frontend queries the
  * Fabric Real-Time Intelligence Eventhouse directly. It acquires an access
- * token for the cluster via MSAL using the signed-in user's identity (the same
- * user who is already authenticated with Fabric SSO), then POSTs KQL to the
- * cluster's `/v1/rest/query` endpoint. The Eventhouse allows CORS from the app
- * origin, so this works from the browser.
+ * token for the cluster via MSAL using the signed-in user's identity, then
+ * POSTs KQL to the cluster's `/v1/rest/query` endpoint. The Eventhouse allows
+ * CORS from the app origin, so this works from the browser.
+ *
+ * Two runtime modes, both driven by the same MSAL instance:
+ *   - Inside the Fabric portal (embedded iframe) — Nested App Auth (NAA) lets
+ *     the host broker a token silently for the user who is already signed in to
+ *     Fabric. No popup, redirect, or extra login: live data "just works".
+ *   - Standalone browser tab — no host broker is present, so a one-time
+ *     interactive sign-in is required. The UI surfaces a "Connect live data"
+ *     button that calls connectDataInteractive() from a user gesture.
  *
  * Configuration (VITE_* env, set at build time):
  *   VITE_KUSTO_CLUSTER   Eventhouse cluster URI
@@ -16,10 +23,14 @@
  *   VITE_KUSTO_SCOPE     (optional) override for the token scope
  */
 import {
-  PublicClientApplication,
+  createNestablePublicClientApplication,
   InteractionRequiredAuthError,
   type AccountInfo,
+  type AuthenticationResult,
+  type IPublicClientApplication,
+  type PopupRequest,
   type RedirectRequest,
+  type SsoSilentRequest,
 } from '@azure/msal-browser';
 
 const CLUSTER = import.meta.env.VITE_KUSTO_CLUSTER as string | undefined;
@@ -35,6 +46,33 @@ const SCOPE = (import.meta.env.VITE_KUSTO_SCOPE as string | undefined) ?? (CLUST
 /** True when direct Eventhouse access is configured (deployed build). */
 export function isDirectKustoConfigured(): boolean {
   return Boolean(CLUSTER && CLIENT_ID);
+}
+
+/**
+ * True when the app runs inside an iframe (e.g. embedded in the Fabric portal).
+ * MSAL forbids the redirect flow in a frame, so interactive sign-in must use a
+ * popup instead.
+ */
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    // A cross-origin `window.top` access throws — which itself means we're framed.
+    return true;
+  }
+}
+
+/**
+ * True when a Nested App Auth bridge (host token broker) is available — the
+ * Fabric portal injects this into embedded apps. Under NAA, MSAL brokers tokens
+ * through the host with no popup, redirect, or hidden iframe (all of which are
+ * blocked in the portal's sandboxed frame).
+ */
+function isNaaAvailable(): boolean {
+  return (
+    typeof (window as { __initializeNestedAppAuth?: unknown }).__initializeNestedAppAuth ===
+    'function'
+  );
 }
 
 export function getClusterUri(): string {
@@ -60,39 +98,39 @@ export function setKustoLoginHint(hint: string | undefined): void {
   loginHint = hint;
 }
 
-let msalInstance: PublicClientApplication | null = null;
-let msalReady: Promise<void> | null = null;
+let msalReady: Promise<IPublicClientApplication> | null = null;
 
-function getMsal(): PublicClientApplication {
+/**
+ * Create (once) a "nestable" MSAL instance. When the app is embedded in the
+ * Fabric portal it uses Nested App Auth (host broker); standalone it behaves
+ * like a normal browser SPA. `createNestablePublicClientApplication` resolves
+ * only after the instance is initialized.
+ */
+async function ensureMsalInitialized(): Promise<IPublicClientApplication> {
   if (!CLIENT_ID) throw new Error('VITE_ENTRA_CLIENT_ID is not configured.');
-  if (!msalInstance) {
-    msalInstance = new PublicClientApplication({
-      auth: {
-        clientId: CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-        redirectUri: window.location.origin,
-      },
-      cache: { cacheLocation: 'localStorage' },
-    });
-  }
-  return msalInstance;
-}
-
-async function ensureMsalInitialized(): Promise<PublicClientApplication> {
-  const msal = getMsal();
+  const clientId = CLIENT_ID;
   if (!msalReady) {
-    msalReady = msal.initialize().then(async () => {
-      // Complete any pending redirect sign-in and adopt the returned account.
+    msalReady = (async () => {
+      const msal = await createNestablePublicClientApplication({
+        auth: {
+          clientId,
+          authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+          redirectUri: window.location.origin,
+        },
+        cache: { cacheLocation: 'localStorage' },
+      });
+      // Complete any pending redirect sign-in (standalone path) and adopt the
+      // returned account. A no-op under NAA.
       const result = await msal.handleRedirectPromise();
       if (result?.account) msal.setActiveAccount(result.account);
       else if (!msal.getActiveAccount()) {
         const first = msal.getAllAccounts()[0];
         if (first) msal.setActiveAccount(first);
       }
-    });
+      return msal;
+    })();
   }
-  await msalReady;
-  return msal;
+  return msalReady;
 }
 
 // Cache the token and de-duplicate concurrent acquisitions so the 5s poll does
@@ -100,32 +138,65 @@ async function ensureMsalInitialized(): Promise<PublicClientApplication> {
 let cachedToken: { token: string; expiresOn: number } | null = null;
 let inFlight: Promise<string> | null = null;
 
+/** Store an MSAL result's access token so subsequent polls reuse it. */
+function cacheResult(res: AuthenticationResult): void {
+  cachedToken = {
+    token: res.accessToken,
+    expiresOn: res.expiresOn ? res.expiresOn.getTime() : Date.now() + 5 * 60_000,
+  };
+}
+
 async function acquireToken(): Promise<string> {
   const msal = await ensureMsalInitialized();
   const scopes = [SCOPE];
   const account: AccountInfo | undefined =
     msal.getActiveAccount() ?? msal.getAllAccounts()[0] ?? undefined;
 
+  // 1. Silent with a known account — a cached/refresh token in a standalone
+  //    browser, or a host-brokered token once NAA has adopted the portal's
+  //    active account.
   if (account) {
     try {
       const res = await msal.acquireTokenSilent({ scopes, account });
+      if (res.account) msal.setActiveAccount(res.account);
+      cacheResult(res);
       return res.accessToken;
     } catch (err) {
-      if (!(err instanceof InteractionRequiredAuthError)) throw err;
+      // Standalone, non-interaction failures (e.g. network) are real errors.
+      if (
+        !isNaaAvailable() &&
+        !isEmbedded() &&
+        !(err instanceof InteractionRequiredAuthError)
+      ) {
+        throw err;
+      }
+      // Otherwise fall through to the brokered / SSO-silent attempt below.
     }
   }
 
-  // No cached account (or silent failed): try SSO against the active Entra
-  // session using the signed-in user's login hint. No popup, no redirect.
-  try {
-    const res = await msal.ssoSilent(loginHint ? { scopes, loginHint } : { scopes });
-    if (res.account) msal.setActiveAccount(res.account);
-    return res.accessToken;
-  } catch {
-    // Do NOT fall back to an automatic interactive flow — that causes the
-    // popup/redirect loop. Surface a typed error the UI can act on.
-    throw new KustoInteractionRequiredError();
+  // 2. No-UI SSO:
+  //    - Fabric portal (NAA): the host broker returns a token with no popup,
+  //      redirect, or hidden iframe — this is what makes the embedded app work
+  //      without any additional user login.
+  //    - Standalone top-level window: reuses an existing Entra session if one
+  //      is present (still no prompt).
+  //    A plain (non-NAA) sandboxed iframe can do neither, so skip to the button.
+  if (isNaaAvailable() || !isEmbedded()) {
+    try {
+      const req: SsoSilentRequest = loginHint ? { scopes, loginHint } : { scopes };
+      const res = await msal.ssoSilent(req);
+      if (res.account) msal.setActiveAccount(res.account);
+      cacheResult(res);
+      return res.accessToken;
+    } catch {
+      // No silent session — fall through to the interactive prompt.
+    }
   }
+
+  // 3. Interaction required. The UI shows a "Connect live data" button that
+  //    calls connectDataInteractive() from a user gesture (a brokered popup
+  //    under NAA, or a redirect to Entra sign-in standalone).
+  throw new KustoInteractionRequiredError();
 }
 
 /** Acquire an access token for the Eventhouse cluster (silent, cached). */
@@ -157,16 +228,38 @@ async function getKustoToken(): Promise<string> {
 }
 
 /**
- * User-initiated interactive sign-in (redirect). Call ONLY from a click
- * handler — never automatically. Navigates the window to Entra and back; on
- * return `handleRedirectPromise` completes the sign-in and tokens are cached.
+ * User-initiated interactive sign-in. Call ONLY from a click handler — never
+ * automatically.
+ *
+ * - Embedded in the Fabric portal (NAA): a brokered popup — the host handles it
+ *   with no real popup window, so it works inside the sandboxed iframe.
+ * - Standalone top-level window: a redirect to Entra and back.
+ * - A plain (non-NAA) iframe cannot complete interactive auth; surface a typed
+ *   error instead of letting MSAL throw `block_nested_popups` / `redirect_in_iframe`.
  */
 export async function connectDataInteractive(): Promise<void> {
   const msal = await ensureMsalInitialized();
-  const request: RedirectRequest = loginHint
+
+  if (isNaaAvailable()) {
+    const req: PopupRequest = loginHint
+      ? { scopes: [SCOPE], loginHint }
+      : { scopes: [SCOPE] };
+    const res = await msal.acquireTokenPopup(req);
+    if (res.account) msal.setActiveAccount(res.account);
+    cacheResult(res);
+    return;
+  }
+
+  if (isEmbedded()) {
+    throw new KustoInteractionRequiredError(
+      'Live data can’t be authorized inside this embedded host. Open the app in a new tab to connect.',
+    );
+  }
+
+  const req: RedirectRequest = loginHint
     ? { scopes: [SCOPE], loginHint }
     : { scopes: [SCOPE] };
-  await msal.acquireTokenRedirect(request);
+  await msal.acquireTokenRedirect(req);
 }
 
 export interface KustoTable {
