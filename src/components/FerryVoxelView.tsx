@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { fetchFerryTwin } from '@/services/twinService';
 import type { FerryTwin } from '@/shared/contract';
 import { ferryPhotoUrl, getFerrySpec } from '@/three/ferries';
+import { HarbourBackdrop } from '@/three/HarbourBackdrop';
 import { VoxelFerry } from '@/three/VoxelFerry';
 import type { PassengerTicket, StaffCard } from '@/three/VoxelFerry';
 import { VesselChecksCard } from '@/components/VesselChecksCard';
@@ -52,8 +53,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
   useEffect(() => {
     const mount = mountRef.current!;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a1826);
-    scene.fog = new THREE.Fog(0x0a1826, 70, 180);
+    scene.fog = new THREE.Fog(0xdfeaf2, 130, 520);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
     camera.position.set(34, 26, 40);
@@ -93,15 +93,11 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
     sun.shadow.camera.bottom = -50;
     scene.add(sun);
 
-    // Water plane the ferry floats on.
-    const water = new THREE.Mesh(
-      new THREE.CircleGeometry(160, 48),
-      new THREE.MeshStandardMaterial({ color: 0x14506a, roughness: 0.35, metalness: 0.2 }),
-    );
-    water.rotation.x = -Math.PI / 2;
-    water.position.y = -0.6;
-    water.receiveShadow = true;
-    scene.add(water);
+    // Daytime Sydney-harbour backdrop: graded sky, animated water with a bow
+    // wake, and a foreshore skyline with the Harbour Bridge and Opera House.
+    const backdrop = new HarbourBackdrop();
+    scene.background = backdrop.sky;
+    scene.add(backdrop.group);
 
     const ferry = new VoxelFerry(spec);
     ferryRef.current = ferry;
@@ -141,7 +137,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       // Nudge the framed vessel slightly up and to the left on screen.
-      camera.setViewOffset(w, h, w * 0.1, h * 0.26, w, h);
+      camera.setViewOffset(w, h, w * 0.1, h * 0.08, w, h);
       camera.updateProjectionMatrix();
     };
     resize();
@@ -157,6 +153,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       ferry.group.position.y = Math.sin(clock.elapsedTime * 1.1) * 0.4;
       ferry.group.rotation.z = Math.sin(clock.elapsedTime * 0.7) * 0.01;
       ferry.update(dt);
+      backdrop.update(clock.elapsedTime);
       controls.update();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(tick);
@@ -223,6 +220,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       ferry.dispose();
+      backdrop.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };

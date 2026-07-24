@@ -180,7 +180,7 @@ interface FigureStyle {
 const pick = <T>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 
 function makeTicket(deck: DeckId): PassengerTicket {
-  let from = pick(WHARVES);
+  const from = pick(WHARVES);
   let to = pick(WHARVES);
   while (to === from) to = pick(WHARVES);
   return {
