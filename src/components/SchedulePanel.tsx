@@ -108,7 +108,15 @@ export function SchedulePanel() {
     };
   }, [allDay]);
 
-  const count = departures.length;
+  // Collapse to the next upcoming departure per route (the last outstanding one).
+  const seenRoutes = new Set<string>();
+  const shown = departures.filter((d) => {
+    if (seenRoutes.has(d.route)) return false;
+    seenRoutes.add(d.route);
+    return true;
+  });
+
+  const count = shown.length;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -150,7 +158,7 @@ export function SchedulePanel() {
         </div>
 
         <div className="flex-1 space-y-1.5 overflow-y-auto px-3 pb-3">
-          {departures.map((d) => {
+          {shown.map((d) => {
             const color = routeColor(d.route);
             const mins = minutesUntil(d.time);
             const soon = !allDay && mins >= 0 && mins <= 10;

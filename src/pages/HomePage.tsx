@@ -83,6 +83,14 @@ export function HomePage() {
         <div className="relative h-full w-full overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-2xl">
           <CesiumView ref={cesium} onStatus={setStatus} onSelectFerry={setSelected} />
           <SidePanel onSelectFerry={(lon, lat) => cesium.current?.flyToFerry(lon, lat)} />
+          {!selected && (
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2">
+              <div className="flex items-center gap-2 rounded-full bg-slate-950/75 px-4 py-2 text-xs font-medium text-white/80 ring-1 ring-white/15 shadow-lg backdrop-blur-md">
+                <span className="text-emerald-300">⚓</span>
+                Click on a ferry to see details
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

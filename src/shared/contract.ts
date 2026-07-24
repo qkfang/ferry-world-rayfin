@@ -79,3 +79,40 @@ export interface FerryScheduleFeed {
   count: number;
   departures: FerryDeparture[];
 }
+
+/** A pre-departure / in-service checklist area. */
+export type CheckCategory =
+  | 'vessel'
+  | 'navigation'
+  | 'safety'
+  | 'crew'
+  | 'passenger'
+  | 'compliance';
+
+/** Outcome an operator records for a single checklist item. */
+export type CheckStatus = 'ok' | 'issue' | 'na';
+
+/** One operator-logged checklist result for a vessel (mirrors VesselCheck). */
+export interface VesselCheck {
+  id: string;
+  /** Vessel business key (ferry_name). */
+  ferryName: string;
+  category: CheckCategory;
+  /** The specific item checked, e.g. "Bilge pumps operational". */
+  item: string;
+  status: CheckStatus;
+  notes?: string;
+  inspector?: string;
+  /** Epoch milliseconds the check was logged. */
+  ts: number;
+}
+
+/** Fields supplied when an operator logs a new check. */
+export interface NewVesselCheck {
+  ferryName: string;
+  category: CheckCategory;
+  item: string;
+  status: CheckStatus;
+  notes?: string;
+  inspector?: string;
+}

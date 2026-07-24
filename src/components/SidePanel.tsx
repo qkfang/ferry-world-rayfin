@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { ChecklistPanel } from '@/components/ChecklistPanel';
 import { FleetPanel } from '@/components/FleetPanel';
 import { SchedulePanel } from '@/components/SchedulePanel';
 
@@ -8,7 +9,7 @@ interface SidePanelProps {
   onSelectFerry: (lon: number, lat: number) => void;
 }
 
-type Tab = 'fleet' | 'timetable';
+type Tab = 'fleet' | 'timetable' | 'checklist';
 
 /**
  * A single hamburger-controlled drawer that hosts both the live Fleet list and
@@ -55,7 +56,7 @@ export function SidePanel({ onSelectFerry }: SidePanelProps) {
         }`}
       >
         {/* Tab switcher */}
-        <div className="m-3 grid grid-cols-2 gap-1 rounded-lg bg-white/[0.06] p-1 text-[12px] font-medium">
+        <div className="m-3 grid grid-cols-3 gap-1 rounded-lg bg-white/[0.06] p-1 text-[12px] font-medium">
           <button
             onClick={() => setTab('fleet')}
             className={`rounded-md py-1.5 transition-colors ${
@@ -72,6 +73,14 @@ export function SidePanel({ onSelectFerry }: SidePanelProps) {
           >
             🕑 Timetable
           </button>
+          <button
+            onClick={() => setTab('checklist')}
+            className={`rounded-md py-1.5 transition-colors ${
+              tab === 'checklist' ? 'bg-[#00843D] text-white' : 'text-white/55 hover:text-white'
+            }`}
+          >
+            ✓ Checks
+          </button>
         </div>
 
         {/* Active panel body — both stay mounted so live polls keep running */}
@@ -80,6 +89,9 @@ export function SidePanel({ onSelectFerry }: SidePanelProps) {
         </div>
         <div className={`min-h-0 flex-1 ${tab === 'timetable' ? 'flex' : 'hidden'}`}>
           <SchedulePanel />
+        </div>
+        <div className={`min-h-0 flex-1 ${tab === 'checklist' ? 'flex' : 'hidden'}`}>
+          <ChecklistPanel />
         </div>
       </div>
     </>

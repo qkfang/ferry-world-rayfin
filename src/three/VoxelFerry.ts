@@ -57,13 +57,17 @@ function buildDeckAreas(spec: FerryModelSpec): Partial<Record<DeckId, DeckArea>>
       cap: 8,
     };
   }
+  // The wheelhouse block sits forward on double-decked ferries but amidships on
+  // single-deck catamarans; centre the captain's walk box on the actual block
+  // (same z as `wheelhouseCenter`) so the figure never floats off the hull.
+  const bridgeZ = (spec.wheelhouse === 'forward' ? 14.5 : -2) * lengthScale;
   areas.bridge = {
     deck: 'bridge',
     y: bridgeY,
     minX: -2.0 * beamScale,
     maxX: 2.0 * beamScale,
-    minZ: 13 * lengthScale,
-    maxZ: 16 * lengthScale,
+    minZ: bridgeZ - 1.5 * lengthScale,
+    maxZ: bridgeZ + 1.5 * lengthScale,
     cap: 1,
   };
   return areas;
@@ -609,41 +613,54 @@ export class VoxelFerry {
     const NAVY = 0x16294d;
     const DARK = 0x24272c;
 
-    // Captain at the wheelhouse helm — navy uniform + white peaked cap.
-    post({ shirt: NAVY, trousers: NAVY, cap: 0xf3f4f6 }, 1.4, 7.0, 14.2, 0, {
+    // Crew stations are derived from the hull scale, wheelhouse position and
+    // deck count so every model keeps its crew on the actual deck floor.
+    const { decks, scale } = this.spec;
+    const L = scale.length;
+    const B = scale.beam;
+    const wh = this.wheelhouseCenter();
+    const bridgeY = decks === 2 ? 7.0 : 4.6;
+
+    // Captain at the wheelhouse helm — navy uniform + white peaked cap. Tracks
+    // the actual wheelhouse block, whether forward or amidships.
+    post({ shirt: NAVY, trousers: NAVY, cap: 0xf3f4f6 }, 1.0 * B, bridgeY, wh.z, 0, {
       role: 'Captain',
       name: pick(NAMES),
       station: 'Wheelhouse',
       duty: 'Driving the vessel',
     });
 
-    // Bar attendants — white shirt + burgundy apron — behind each bar.
-    post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 2.15, -12.8, 0, {
+    // Bar attendant — white shirt + burgundy apron — behind the lower bar.
+    post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 2.15, -12.8 * L, 0, {
       role: 'Bar attendant',
       name: pick(NAMES),
       station: 'Lower saloon bar',
       duty: 'Serving drinks',
     });
-    post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 7.0, -12.8, 0, {
-      role: 'Bar attendant',
-      name: pick(NAMES),
-      station: 'Upper deck kiosk',
-      duty: 'Serving drinks',
-    });
 
-    // Deckhands — navy uniform + hi-vis vest — supporting on the open decks.
-    post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 0, 2.15, 15, Math.PI, {
+    // Deckhand — navy uniform + hi-vis vest — on the bow open deck.
+    post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 0, 2.15, 15 * L, Math.PI, {
       role: 'Deckhand',
       name: pick(NAMES),
       station: 'Bow deck',
       duty: 'Assisting passengers',
     });
-    post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 3.8, 7.0, 0, -Math.PI / 2, {
-      role: 'Deckhand',
-      name: pick(NAMES),
-      station: 'Upper deck',
-      duty: 'Assisting passengers',
-    });
+
+    // Upper-deck crew only exist on double-decked ferries.
+    if (decks === 2) {
+      post({ shirt: 0xf5f5f5, trousers: DARK, apron: 0x8a1c1c }, 0, 7.0, -12.8 * L, 0, {
+        role: 'Bar attendant',
+        name: pick(NAMES),
+        station: 'Upper deck kiosk',
+        duty: 'Serving drinks',
+      });
+      post({ shirt: NAVY, trousers: DARK, vest: 0xff7a1a }, 3.8 * B, 7.0, 0, -Math.PI / 2, {
+        role: 'Deckhand',
+        name: pick(NAMES),
+        station: 'Upper deck',
+        duty: 'Assisting passengers',
+      });
+    }
   }
 
   private spawnPassenger(area: DeckArea, list: Passenger[]): void {

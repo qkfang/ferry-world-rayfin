@@ -7,6 +7,7 @@ import type { FerryTwin } from '@/shared/contract';
 import { ferryPhotoUrl, getFerrySpec } from '@/three/ferries';
 import { VoxelFerry } from '@/three/VoxelFerry';
 import type { PassengerTicket, StaffCard } from '@/three/VoxelFerry';
+import { VesselChecksCard } from '@/components/VesselChecksCard';
 
 const DECK_LABEL: Record<string, string> = {
   lower: 'Lower saloon',
@@ -36,6 +37,9 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
   const [ticket, setTicket] = useState<PassengerTicket | null>(null);
   const [staff, setStaff] = useState<StaffCard | null>(null);
   const [autoOrbit, setAutoOrbit] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(true);
+  const [showDeck, setShowDeck] = useState(true);
+  const [showChecks, setShowChecks] = useState(false);
 
   const total = useMemo(
     () => (twin ? twin.decks.reduce((n, d) => n + d.occupancy, 0) : 0),
@@ -268,18 +272,47 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
         </p>
       </div>
 
+      {/* Vessel checks — left-side popup with previous checks + add form */}
+      {showChecks ? (
+        <VesselChecksCard vesselName={vesselName} onClose={() => setShowChecks(false)} />
+      ) : (
+        <button
+          onClick={() => setShowChecks(true)}
+          className="absolute left-5 top-20 z-20 rounded-lg bg-slate-900/70 px-3 py-1.5 text-sm font-medium text-white/80 shadow ring-1 ring-white/15 hover:bg-slate-800"
+        >
+          ✓ Vessel checks
+        </button>
+      )}
+
       {/* Real reference photo of the actual ferry, for comparison with the voxel model */}
-      {photoUrl && (
+      {photoUrl && showPhoto && (
         <div className="absolute right-5 bottom-16 w-56 origin-bottom-right scale-[2] overflow-hidden rounded-xl bg-slate-950/70 shadow-xl ring-1 ring-white/10">
+          <button
+            onClick={() => setShowPhoto(false)}
+            className="absolute right-1 top-1 z-10 rounded-md bg-slate-950/60 px-1.5 text-white/60 hover:text-white"
+            aria-label="Close ferry photo"
+          >
+            ✕
+          </button>
           <img src={photoUrl} alt={vesselName} className="h-32 w-full object-cover" />
           <div className="px-3 py-2 text-[11px] text-white/60">{spec.fleetClass}</div>
         </div>
       )}
 
       {/* Deck occupancy readout from the twin telemetry */}
-      <div className="absolute bottom-5 left-5 w-64 origin-bottom-left scale-[2] rounded-xl bg-slate-950/70 p-3 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">
-          Deck occupancy
+      {showDeck && (
+      <div className="absolute bottom-5 left-5 w-64 origin-bottom-left scale-[1.4] rounded-xl bg-slate-950/70 p-3 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-white/50">
+            Deck occupancy
+          </span>
+          <button
+            onClick={() => setShowDeck(false)}
+            className="rounded-md px-1 text-white/50 hover:text-white"
+            aria-label="Close deck occupancy"
+          >
+            ✕
+          </button>
         </div>
         {(twin?.decks ?? []).map((d) => {
           const pct = Math.min(100, (d.occupancy / Math.max(1, d.capacity)) * 100);
@@ -302,6 +335,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
         })}
         {!twin && <p className="text-[12px] text-white/40">Loading twin telemetry…</p>}
       </div>
+      )}
 
       {/* Passenger travel card, shown when a voxel figure is clicked */}
       {ticket && (
@@ -359,7 +393,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
 
       {/* Crew card, shown when a uniformed staff figure is clicked */}
       {staff && (
-        <div className="absolute right-5 top-16 w-72 origin-top-right scale-[2] rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+        <div className="absolute right-5 top-16 w-72 origin-top-right scale-[1.4] rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300/80">
