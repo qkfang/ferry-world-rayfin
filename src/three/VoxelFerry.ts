@@ -436,8 +436,7 @@ export class VoxelFerry {
     this.box(m.deck, beam * 0.97, 0.3, hullLen * 0.9, 0, 2.0, -1 * L);
     for (const side of [-1, 1] as const)
       this.box(m.sheer, 0.5, 1.1, hullLen * 0.92, side * beam * 0.475, 2.55, -1 * L);
-    this.box(m.sheer, beam * 0.95, 1.1, 0.6, 0, 2.55, 18.4 * L);
-    this.box(m.sheer, beam * 0.95, 1.1, 0.6, 0, 2.55, -19.4 * L);
+    this.buildBowStern();
 
     // Lower saloon: yellow body, black wraparound glazing with mullions,
     // green roof — plus the signature forward-raked black window wall.
@@ -567,6 +566,60 @@ export class VoxelFerry {
     ring.rotation.y = Math.PI / 2;
     ring.castShadow = true;
     this.group.add(ring);
+  }
+
+  /** Detailed ends: a pointed foredeck with a V-bulwark, windlass, bollards and
+   * a jackstaff forward, and a closed transom with mooring bollards and a raked
+   * ensign staff aft — so the bow and stern read as a real ferry, not a box. */
+  private buildBowStern(): void {
+    const m = this.mat;
+    const L = this.spec.scale.length;
+    const B = this.spec.scale.beam;
+    const beam = 13 * B;
+    const edge = beam * 0.46;
+
+    // Bow: foredeck plates narrowing toward the stem, framed by a V-bulwark.
+    this.box(m.deck, beam * 0.62, 0.3, 3.4 * L, 0, 2.0, 18.6 * L);
+    this.box(m.deck, beam * 0.34, 0.3, 3.0 * L, 0, 2.0, 21.4 * L);
+    this.angled(m.sheer, -edge, 17.4 * L, 0, 22.6 * L, 2.55, 1.1, 0.45);
+    this.angled(m.sheer, edge, 17.4 * L, 0, 22.6 * L, 2.55, 1.1, 0.45);
+    // Windlass, mooring bollards and a stowed anchor on the foredeck.
+    this.box(m.mullion, 1.8, 0.9, 1.4, 0, 2.45, 17 * L);
+    for (const s of [-1, 1] as const)
+      this.box(m.mullion, 0.5, 1.2, 0.5, s * beam * 0.24, 2.6, 15.5 * L);
+    this.box(m.chrome, 1.3, 0.3, 0.7, 0, 2.65, 21.4 * L);
+    // Jackstaff with a small flag at the stem head.
+    this.box(m.chrome, 0.16, 3.2, 0.16, 0, 4.1, 22.4 * L);
+    this.box(m.seat, 1.0, 0.6, 0.08, 0.6, 5.2, 22.4 * L);
+
+    // Stern: a closed transom, a low bulwark cap and a boarding-gate opening.
+    this.box(m.hull, beam * 0.98, 2.4, 0.5, 0, 0.8, -20 * L);
+    for (const s of [-1, 1] as const)
+      this.box(m.sheer, beam * 0.34, 1.1, 0.6, s * beam * 0.3, 2.55, -19.5 * L);
+    for (const s of [-1, 1] as const)
+      this.box(m.mullion, 0.5, 1.2, 0.5, s * beam * 0.24, 2.6, -18 * L);
+    // Raked ensign staff and flag at the taffrail.
+    const staff = this.box(m.chrome, 0.16, 3.6, 0.16, 0, 4.3, -19.6 * L);
+    staff.rotation.x = -0.32;
+    this.box(m.seat, 1.2, 0.7, 0.08, 0.7, 5.7, -20.3 * L);
+    this.box(m.rail, 1.2, 0.22, 0.08, 0.7, 6.05, -20.3 * L);
+  }
+
+  /** A box rotated about Y to run between two deck points (angled bulwarks). */
+  private angled(
+    mat: THREE.Material,
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    y: number,
+    h: number,
+    t: number,
+  ): void {
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const b = this.box(mat, t, h, Math.hypot(dx, dz), (x0 + x1) / 2, y, (z0 + z1) / 2);
+    b.rotation.y = Math.atan2(dx, dz);
   }
 
   /** A triangular prism (raked bow, sloped window walls, gold windscreen).
