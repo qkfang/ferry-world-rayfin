@@ -270,14 +270,14 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
 
       {/* Real reference photo of the actual ferry, for comparison with the voxel model */}
       {photoUrl && (
-        <div className="absolute right-5 bottom-16 w-56 overflow-hidden rounded-xl bg-slate-950/70 shadow-xl ring-1 ring-white/10">
+        <div className="absolute right-5 bottom-16 w-56 origin-bottom-right scale-[2] overflow-hidden rounded-xl bg-slate-950/70 shadow-xl ring-1 ring-white/10">
           <img src={photoUrl} alt={vesselName} className="h-32 w-full object-cover" />
           <div className="px-3 py-2 text-[11px] text-white/60">{spec.fleetClass}</div>
         </div>
       )}
 
       {/* Deck occupancy readout from the twin telemetry */}
-      <div className="absolute bottom-5 left-5 w-64 rounded-xl bg-slate-950/70 p-3 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+      <div className="absolute bottom-5 left-5 w-64 origin-bottom-left scale-[2] rounded-xl bg-slate-950/70 p-3 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">
           Deck occupancy
         </div>
@@ -359,7 +359,7 @@ export function FerryVoxelView({ vesselId, vesselName, onClose }: FerryVoxelView
 
       {/* Crew card, shown when a uniformed staff figure is clicked */}
       {staff && (
-        <div className="absolute right-5 top-16 w-72 rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
+        <div className="absolute right-5 top-16 w-72 origin-top-right scale-[2] rounded-xl bg-slate-950/80 p-4 text-white shadow-xl backdrop-blur-md ring-1 ring-white/10">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300/80">

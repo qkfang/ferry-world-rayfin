@@ -5,7 +5,7 @@
   "type": "module",
   "template": {
     "name": "blankapp",
-    "displayName": "Blank App",
+    "displayName": "Sydney Ferries",
     "description": "Bare-bones Fabric-authenticated React + Vite app — sign-in, routing, and a placeholder home page, with no data layer to remove"
   },
   "scripts": {
