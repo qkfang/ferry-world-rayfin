@@ -1,6 +1,6 @@
-# Sydney Harbour — Live Ferries 3D
+# Sydney Ferries — Live Ferries 3D
 
-A photorealistic 3D map of Sydney Harbour that renders **live ferry positions**
+A photorealistic 3D map of Sydney Ferries that renders **live ferry positions**
 from a Fabric Real-Time Intelligence **Eventhouse** (KQL). Built as a **Rayfin
 Fabric App** (`Test_App`) on the `Rayfin_Hack` workspace: React 19 + Vite +
 Cesium frontend, Fabric SSO for identity, and Fabric-hosted static content.
@@ -274,6 +274,6 @@ Hosting URL: `https://broad-inlet-39886f4465-australiaeast.webapp.fabricapps.net
   at it — no scene changes required.
 - **Server-side GTFS:** proxy the TfNSW timetable through a function so the
   schedule works in the deployed app.
-- **Voxel coastline (Phase 2):** bake Sydney Harbour coastline GeoJSON
+- **Voxel coastline (Phase 2):** bake Sydney Ferries coastline GeoJSON
   (OSM `natural=coastline` via Overpass) into a `harbour.glb` for the Three.js
   renderer.

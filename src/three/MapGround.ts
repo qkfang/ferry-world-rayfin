@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { toWorld } from '@/shared/geo';
 
 /**
- * Real Sydney Harbour as 3D terrain. For each map tile we build a subdivided
+ * Real Sydney Ferries as 3D terrain. For each map tile we build a subdivided
  * plane, drape it with a raster basemap tile, and displace its vertices using a
  * co-located DEM (digital elevation model) tile — so headlands, cliffs and the
  * Heads actually rise out of the water. Everything is positioned with the same

@@ -152,7 +152,7 @@ export function FerryScene() {
       {/* Title / status */}
       <div className="pointer-events-none absolute left-5 top-4 select-none">
         <h1 className="text-xl font-semibold text-white drop-shadow">
-          Sydney Harbour · Live Ferries
+          Sydney Ferries · Live Ferries
         </h1>
         <p className="mt-1 text-sm text-white/80 drop-shadow">
           {count} ferries live

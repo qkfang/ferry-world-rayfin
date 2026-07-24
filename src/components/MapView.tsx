@@ -278,7 +278,7 @@ export function MapView() {
       <div ref={mapDiv} className="h-full w-full" />
 
       <div className="pointer-events-none absolute left-4 top-4 select-none rounded-lg bg-slate-900/70 px-3 py-2 shadow-lg backdrop-blur-sm">
-        <h1 className="text-lg font-semibold text-white">Sydney Harbour · Live Ferries</h1>
+        <h1 className="text-lg font-semibold text-white">Sydney Ferries · Live Ferries</h1>
         <p className="text-sm text-white/85">
           {count} ferries live{asOf ? ` · updated ${new Date(asOf).toLocaleTimeString()}` : ''}
         </p>

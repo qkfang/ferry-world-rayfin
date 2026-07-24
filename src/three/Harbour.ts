@@ -7,7 +7,7 @@ import { MapGround } from './MapGround';
 import { makeTextSprite } from './labels';
 
 /**
- * Harbour ground: real Sydney Harbour 3D terrain (see MapGround) — satellite
+ * Harbour ground: real Sydney Ferries 3D terrain (see MapGround) — satellite
  * imagery draped over DEM elevation — aligned to the same projection as the
  * live ferries, plus wharf markers from the real ReferenceLocation rows.
  */

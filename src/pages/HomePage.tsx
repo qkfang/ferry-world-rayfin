@@ -43,7 +43,7 @@ export function HomePage() {
             ⚓
           </span>
           <div className="leading-tight">
-            <h1 className="text-[15px] font-semibold tracking-wide text-white">Sydney Harbour</h1>
+            <h1 className="text-[15px] font-semibold tracking-wide text-white">Sydney Ferries</h1>
             <p className="text-[11px] text-white/45">Live Ferry Tracker</p>
           </div>
         </div>

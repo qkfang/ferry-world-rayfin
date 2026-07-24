@@ -155,7 +155,7 @@ export function FleetPanel({ onSelect }: FleetPanelProps) {
           </span>
           <div className="leading-tight">
             <div className="text-[13px] font-semibold tracking-wide text-white">Active Fleet</div>
-            <div className="text-[11px] text-white/45">Sydney Harbour · live</div>
+            <div className="text-[11px] text-white/45">Sydney Ferries · live</div>
           </div>
         </div>
         <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white tabular-nums">

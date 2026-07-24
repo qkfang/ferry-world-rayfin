@@ -1,7 +1,7 @@
 /**
  * Local ENU (East-North-Up) projection centred on Circular Quay. Turns
  * lat/lon into a flat metric game world (metres). Accurate enough across the
- * few km of Sydney Harbour; do NOT reuse for all of NSW.
+ * few km of Sydney Ferries; do NOT reuse for all of NSW.
  *
  * Three.js axes: +x = east, +z = south (north maps to -z), y = up.
  */
